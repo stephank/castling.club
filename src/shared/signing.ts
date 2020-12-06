@@ -180,6 +180,10 @@ export default async ({
   const signHook: SigningService["signHook"] = (keyId, privateKeyPem) => (
     options
   ) => {
+    if (!options.body && options.json) {
+      options.body = JSON.stringify(options.json);
+    }
+
     let body = options.body;
     if (typeof body !== "string" && !Buffer.isBuffer(body)) {
       throw Error("Cannot sign streaming body");
@@ -195,9 +199,10 @@ export default async ({
     options.headers.date = new Date().toUTCString();
 
     // Build the signed data.
+    const { method, url } = options;
     const signedHeaders = Object.keys(options.headers);
     const signedData = [
-      `(request-target): ${options.method.toLowerCase()} ${options.path}`,
+      `(request-target): ${method.toLowerCase()} ${url.pathname}`,
       ...signedHeaders.map(
         (name) => `${name.toLowerCase()}: ${options.headers[name]}`
       ),
