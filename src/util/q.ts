@@ -81,7 +81,7 @@ q.withClient = async <T>(
   fn: (client: ClientBase) => Promise<T>
 ): Promise<T> => {
   // Can't rely on an `instanceof` check here, unfortunately.
-  if (pg.constructor.name === "Pool") {
+  if ("idleCount" in pg) {
     const pool = <Pool>pg;
     const client = await pool.connect();
     try {
