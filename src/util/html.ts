@@ -1,10 +1,10 @@
 import parse5, {
-  DefaultTreeNode as Node,
-  DefaultTreeTextNode as TextNode,
-  DefaultTreeParentNode as ParentNode,
-  DefaultTreeChildNode as ChildNode,
-  DefaultTreeElement as Element,
-  DefaultTreeDocumentFragment as DocumentFragment,
+  Node,
+  TextNode,
+  ParentNode,
+  ChildNode,
+  Element,
+  DocumentFragment,
 } from "parse5";
 
 import { ensureArray } from "./misc";

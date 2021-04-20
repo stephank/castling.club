@@ -40,7 +40,8 @@ export default async ({
 
   // Handle Webfinger requests.
   router.get("/.well-known/webfinger", (ctx) => {
-    if (validQueries.has(ctx.query.resource)) {
+    const { resource } = ctx.query;
+    if (typeof resource === "string" && validQueries.has(resource)) {
       ctx.body = {
         subject: accountUrl,
         links: [
