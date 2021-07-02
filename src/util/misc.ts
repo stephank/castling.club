@@ -26,7 +26,10 @@ const INVALID_TLDS = new Set([
 const INVALID_HOST_CHARS = new Set("\0\t\n\r #%/:?@[\\]");
 
 // A very simple namespacing tool.
-export const ns = (prefix: string) => (name: string): string => prefix + name;
+export const ns =
+  (prefix: string) =>
+  (name: string): string =>
+    prefix + name;
 
 // No-op function.
 export const noop = (): void => {};
@@ -59,12 +62,14 @@ export const sortBy = <T, S extends number>(
 
 // Detach an async function. The wrapped function returns a promise for
 // nothing, which also never fails. Errors will be logged.
-export const detach = <F extends AnyAsyncFunction>(
-  fn: F
-): ((...args: ArgumentsOf<F>) => Promise<void>) => async (...args) =>
-  fn(...args).then(exports.noop, (err) => {
-    console.error(err);
-  });
+export const detach =
+  <F extends AnyAsyncFunction>(
+    fn: F
+  ): ((...args: ArgumentsOf<F>) => Promise<void>) =>
+  async (...args) =>
+    fn(...args).then(exports.noop, (err) => {
+      console.error(err);
+    });
 
 // Get the origin of a URL.
 export const originOf = (url: string): string | undefined => {

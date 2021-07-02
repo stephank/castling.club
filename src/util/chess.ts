@@ -370,145 +370,141 @@ export default (initialFen: string = DEFAULT_POSITION): Game => {
 
   // Return a set of all pseudo-legal moves.
   // (This includes moves that allow the king to be captured.)
-  const allMoves = memoize(
-    (): Set<Move> => {
-      const moves: Set<Move> = new Set();
-      const us = turn;
-      const them = swapColor(us);
-      const secondRank = { [BLACK]: RANK_7, [WHITE]: RANK_2 };
+  const allMoves = memoize((): Set<Move> => {
+    const moves: Set<Move> = new Set();
+    const us = turn;
+    const them = swapColor(us);
+    const secondRank = { [BLACK]: RANK_7, [WHITE]: RANK_2 };
 
-      let firstSq = SQUARES.a8;
-      let lastSq = SQUARES.h1;
+    let firstSq = SQUARES.a8;
+    let lastSq = SQUARES.h1;
 
-      const addMove = (from: number, to: number, flags: Flags): void => {
-        // Is pawn promotion?
-        if (
-          fenType(assertSquare(board[from])) === PAWN &&
-          (rank(to) === RANK_8 || rank(to) === RANK_1)
-        ) {
-          const pieces: Piece[] = [QUEEN, ROOK, BISHOP, KNIGHT];
-          for (let i = 0, len = pieces.length; i < len; i++) {
-            moves.add(buildMove(board, from, to, flags, pieces[i]));
+    const addMove = (from: number, to: number, flags: Flags): void => {
+      // Is pawn promotion?
+      if (
+        fenType(assertSquare(board[from])) === PAWN &&
+        (rank(to) === RANK_8 || rank(to) === RANK_1)
+      ) {
+        const pieces: Piece[] = [QUEEN, ROOK, BISHOP, KNIGHT];
+        for (let i = 0, len = pieces.length; i < len; i++) {
+          moves.add(buildMove(board, from, to, flags, pieces[i]));
+        }
+      } else {
+        moves.add(buildMove(board, from, to, flags));
+      }
+    };
+
+    for (let i = firstSq; i <= lastSq; i++) {
+      // Did we run off the end of the board
+      if (i & 0x88) {
+        i += 7;
+        continue;
+      }
+
+      const piece = board[i];
+      if (piece === "" || fenColor(piece) !== us) {
+        continue;
+      }
+
+      const pieceType = fenType(piece);
+
+      if (pieceType === PAWN) {
+        // Single square, non-capturing.
+        const square1 = i + PAWN_OFFSETS[us][0];
+        if (!board[square1]) {
+          addMove(i, square1, Flags.NORMAL);
+
+          // Double square.
+          const square2 = i + PAWN_OFFSETS[us][1];
+          if (secondRank[us] === rank(i) && !board[square2]) {
+            addMove(i, square2, Flags.BIG_PAWN);
           }
-        } else {
-          moves.add(buildMove(board, from, to, flags));
-        }
-      };
-
-      for (let i = firstSq; i <= lastSq; i++) {
-        // Did we run off the end of the board
-        if (i & 0x88) {
-          i += 7;
-          continue;
         }
 
-        const piece = board[i];
-        if (piece === "" || fenColor(piece) !== us) {
-          continue;
-        }
+        // Pawn captures.
+        for (let j = 2; j < 4; j++) {
+          const square = i + PAWN_OFFSETS[us][j];
+          if (square & 0x88) continue;
 
-        const pieceType = fenType(piece);
-
-        if (pieceType === PAWN) {
-          // Single square, non-capturing.
-          const square1 = i + PAWN_OFFSETS[us][0];
-          if (!board[square1]) {
-            addMove(i, square1, Flags.NORMAL);
-
-            // Double square.
-            const square2 = i + PAWN_OFFSETS[us][1];
-            if (secondRank[us] === rank(i) && !board[square2]) {
-              addMove(i, square2, Flags.BIG_PAWN);
-            }
+          const squarePiece = board[square];
+          if (squarePiece !== "" && fenColor(squarePiece) === them) {
+            addMove(i, square, Flags.CAPTURE);
+          } else if (square === epSquare) {
+            addMove(i, epSquare, Flags.EP_CAPTURE);
           }
+        }
+      } else {
+        const len = PIECE_OFFSETS[pieceType].length;
+        for (let j = 0; j < len; j++) {
+          const offset = PIECE_OFFSETS[pieceType][j];
+          let square = i;
 
-          // Pawn captures.
-          for (let j = 2; j < 4; j++) {
-            const square = i + PAWN_OFFSETS[us][j];
-            if (square & 0x88) continue;
+          for (;;) {
+            square += offset;
+            if (square & 0x88) break;
 
             const squarePiece = board[square];
-            if (squarePiece !== "" && fenColor(squarePiece) === them) {
-              addMove(i, square, Flags.CAPTURE);
-            } else if (square === epSquare) {
-              addMove(i, epSquare, Flags.EP_CAPTURE);
+            if (squarePiece === "") {
+              addMove(i, square, Flags.NORMAL);
+            } else {
+              if (fenColor(squarePiece) !== us) {
+                addMove(i, square, Flags.CAPTURE);
+              }
+              break;
             }
-          }
-        } else {
-          const len = PIECE_OFFSETS[pieceType].length;
-          for (let j = 0; j < len; j++) {
-            const offset = PIECE_OFFSETS[pieceType][j];
-            let square = i;
 
-            for (;;) {
-              square += offset;
-              if (square & 0x88) break;
-
-              const squarePiece = board[square];
-              if (squarePiece === "") {
-                addMove(i, square, Flags.NORMAL);
-              } else {
-                if (fenColor(squarePiece) !== us) {
-                  addMove(i, square, Flags.CAPTURE);
-                }
-                break;
-              }
-
-              // Break if knight or king.
-              if (pieceType === KNIGHT || pieceType === KING) {
-                break;
-              }
+            // Break if knight or king.
+            if (pieceType === KNIGHT || pieceType === KING) {
+              break;
             }
           }
         }
       }
-
-      // King-side castling.
-      if (castling[us] & Flags.KSIDE_CASTLE) {
-        const castlingFrom = kings[us];
-        const castlingTo = castlingFrom + 2;
-
-        if (
-          !board[castlingFrom + 1] &&
-          !board[castlingTo] &&
-          !attacked(them, kings[us]) &&
-          !attacked(them, castlingFrom + 1) &&
-          !attacked(them, castlingTo)
-        ) {
-          addMove(kings[us], castlingTo, Flags.KSIDE_CASTLE);
-        }
-      }
-
-      // Queen-side castling.
-      if (castling[us] & Flags.QSIDE_CASTLE) {
-        const castlingFrom = kings[us];
-        const castlingTo = castlingFrom - 2;
-
-        if (
-          !board[castlingFrom - 1] &&
-          !board[castlingFrom - 2] &&
-          !board[castlingFrom - 3] &&
-          !attacked(them, kings[us]) &&
-          !attacked(them, castlingFrom - 1) &&
-          !attacked(them, castlingTo)
-        ) {
-          addMove(kings[us], castlingTo, Flags.QSIDE_CASTLE);
-        }
-      }
-
-      return moves;
     }
-  );
+
+    // King-side castling.
+    if (castling[us] & Flags.KSIDE_CASTLE) {
+      const castlingFrom = kings[us];
+      const castlingTo = castlingFrom + 2;
+
+      if (
+        !board[castlingFrom + 1] &&
+        !board[castlingTo] &&
+        !attacked(them, kings[us]) &&
+        !attacked(them, castlingFrom + 1) &&
+        !attacked(them, castlingTo)
+      ) {
+        addMove(kings[us], castlingTo, Flags.KSIDE_CASTLE);
+      }
+    }
+
+    // Queen-side castling.
+    if (castling[us] & Flags.QSIDE_CASTLE) {
+      const castlingFrom = kings[us];
+      const castlingTo = castlingFrom - 2;
+
+      if (
+        !board[castlingFrom - 1] &&
+        !board[castlingFrom - 2] &&
+        !board[castlingFrom - 3] &&
+        !attacked(them, kings[us]) &&
+        !attacked(them, castlingFrom - 1) &&
+        !attacked(them, castlingTo)
+      ) {
+        addMove(kings[us], castlingTo, Flags.QSIDE_CASTLE);
+      }
+    }
+
+    return moves;
+  });
 
   // Return a set of all legal moves.
-  const legalMoves = memoize(
-    (): Set<Move> => {
-      const us = turn;
-      return new Set(
-        [...allMoves()].filter((move) => tryMove(move, () => !kingAttacked(us)))
-      );
-    }
-  );
+  const legalMoves = memoize((): Set<Move> => {
+    const us = turn;
+    return new Set(
+      [...allMoves()].filter((move) => tryMove(move, () => !kingAttacked(us)))
+    );
+  });
 
   // Convert a move from 0x88 coordinates to Standard Algebraic Notation (SAN).
   //

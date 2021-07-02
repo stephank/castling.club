@@ -177,55 +177,54 @@ export default async ({
   };
 
   // Hook for `got` `beforeRequest` to sign a request using the given key.
-  const signHook: SigningService["signHook"] = (keyId, privateKeyPem) => (
-    options
-  ) => {
-    if (!options.body && options.json) {
-      options.body = JSON.stringify(options.json);
-    }
+  const signHook: SigningService["signHook"] =
+    (keyId, privateKeyPem) => (options) => {
+      if (!options.body && options.json) {
+        options.body = JSON.stringify(options.json);
+      }
 
-    let body = options.body;
-    if (typeof body !== "string" && !Buffer.isBuffer(body)) {
-      throw Error("Cannot sign streaming body");
-    }
+      let body = options.body;
+      if (typeof body !== "string" && !Buffer.isBuffer(body)) {
+        throw Error("Cannot sign streaming body");
+      }
 
-    // Hash the body.
-    const sha256 = crypto.createHash("sha256").update(body).digest("base64");
+      // Hash the body.
+      const sha256 = crypto.createHash("sha256").update(body).digest("base64");
 
-    // Create the `Digest` header.
-    options.headers.digest = `SHA-256=${sha256}`;
+      // Create the `Digest` header.
+      options.headers.digest = `SHA-256=${sha256}`;
 
-    // Create our own `Date` header, because we include it in the signature.
-    options.headers.date = new Date().toUTCString();
+      // Create our own `Date` header, because we include it in the signature.
+      options.headers.date = new Date().toUTCString();
 
-    // Build the signed data.
-    const { method, url } = options;
-    const signedHeaders = Object.keys(options.headers);
-    const signedData = [
-      `(request-target): ${method.toLowerCase()} ${url.pathname}`,
-      ...signedHeaders.map(
-        (name) => `${name.toLowerCase()}: ${options.headers[name]}`
-      ),
-    ].join("\n");
+      // Build the signed data.
+      const { method, url } = options;
+      const signedHeaders = Object.keys(options.headers);
+      const signedData = [
+        `(request-target): ${method.toLowerCase()} ${url.pathname}`,
+        ...signedHeaders.map(
+          (name) => `${name.toLowerCase()}: ${options.headers[name]}`
+        ),
+      ].join("\n");
 
-    // Sign the headers.
-    // @todo: Support non-RSA keys.
-    const signature = crypto
-      .createSign("sha256")
-      .update(signedData)
-      .sign(privateKeyPem, "base64");
+      // Sign the headers.
+      // @todo: Support non-RSA keys.
+      const signature = crypto
+        .createSign("sha256")
+        .update(signedData)
+        .sign(privateKeyPem, "base64");
 
-    // Create the `Signature` header.
-    const signatureHeaders = [
-      "(request-target)",
-      ...signedHeaders.map((name) => name.toLowerCase()),
-    ].join(" ");
-    options.headers.signature = [
-      `keyId="${keyId}"`,
-      `headers="${signatureHeaders}"`,
-      `signature="${signature}"`,
-    ].join(",");
-  };
+      // Create the `Signature` header.
+      const signatureHeaders = [
+        "(request-target)",
+        ...signedHeaders.map((name) => name.toLowerCase()),
+      ].join(" ");
+      options.headers.signature = [
+        `keyId="${keyId}"`,
+        `headers="${signatureHeaders}"`,
+        `signature="${signature}"`,
+      ].join(",");
+    };
 
   return { verify, signHook };
 };

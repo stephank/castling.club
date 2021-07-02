@@ -120,31 +120,31 @@ export const node: Parser<string | undefined> = (terms) => nodes(terms)[0];
 //
 // The `languages` option is an array of languages to look for. It should
 // usually end with the empty string, which acts as a wildcard.
-export const text = (...languages: string[]): Parser<string | undefined> => (
-  terms
-) => {
-  const literals = <Literal[]>(
-    terms.filter((term) => term.termType === "Literal")
-  );
+export const text =
+  (...languages: string[]): Parser<string | undefined> =>
+  (terms) => {
+    const literals = <Literal[]>(
+      terms.filter((term) => term.termType === "Literal")
+    );
 
-  const strings = literals.filter(
-    (term) => term.datatype.value === XML("string")
-  );
-  const langStrings = literals.filter(
-    (term) => term.datatype.value === RDF("langString")
-  );
+    const strings = literals.filter(
+      (term) => term.datatype.value === XML("string")
+    );
+    const langStrings = literals.filter(
+      (term) => term.datatype.value === RDF("langString")
+    );
 
-  for (const language of languages) {
-    const result = language
-      ? langStrings.find((term) => term.language === language)
-      : strings[0] || langStrings[0];
-    if (result) {
-      return result.value;
+    for (const language of languages) {
+      const result = language
+        ? langStrings.find((term) => term.language === language)
+        : strings[0] || langStrings[0];
+      if (result) {
+        return result.value;
+      }
     }
-  }
 
-  return undefined;
-};
+    return undefined;
+  };
 
 // Short-hands for common text matchers.
 export const anyText = text("");

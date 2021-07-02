@@ -105,8 +105,7 @@ describe("Algebraic Notation", () => {
       `),
     },
     {
-      fen:
-        "r3k2r/p2pqpb1/1n2pnp1/2pPN3/1p2P3/2N2Q1p/PPPB1PPP/R3K2R w KQkq c6 0 2",
+      fen: "r3k2r/p2pqpb1/1n2pnp1/2pPN3/1p2P3/2N2Q1p/PPPB1PPP/R3K2R w KQkq c6 0 2",
       moves: moveSet(`
         gxh3 Qxf6 Qxh3 Nxd7 Nxf7 Nxg6 dxc6 dxe6
         Rg1 Rf1 Ke2 Kf1 Kd1 Rb1 Rc1 Rd1 g3

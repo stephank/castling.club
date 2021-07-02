@@ -50,7 +50,8 @@ type GameMeta = Pick<
   "id" | "badge" | "whiteId" | "whiteName" | "blackId" | "blackName"
 >;
 
-const UUID_REGEXP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEXP =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // What kind of actors can be challengers.
 const CHALLENGER_TYPES = new Set([AS("Person")]);
