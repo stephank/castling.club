@@ -731,7 +731,7 @@ __metadata:
     typescript: 4.5.5
     uuid: ^8.3.2
   bin:
-    castlingclub: ./server.js
+    castlingclub: ./tools/server.js
     castlingclub-migrate: ./tools/migrate.js
   languageName: unknown
   linkType: soft
