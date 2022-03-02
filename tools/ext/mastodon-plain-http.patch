@@ -1,0 +1,13 @@
+diff --git a/app/services/resolve_account_service.rb b/app/services/resolve_account_service.rb
+index 4323e7f06..51678b3ed 100644
+--- a/app/services/resolve_account_service.rb
++++ b/app/services/resolve_account_service.rb
+@@ -23,7 +23,7 @@ class ResolveAccountService < BaseService
+ 
+     Rails.logger.debug "Looking up webfinger for #{uri}"
+ 
+-    @webfinger = Goldfinger.finger("acct:#{uri}")
++    @webfinger = Goldfinger.finger("acct:#{uri}", :ssl => false)
+ 
+     confirmed_username, confirmed_domain = @webfinger.subject.gsub(/\Aacct:/, '').split('@')
+ 

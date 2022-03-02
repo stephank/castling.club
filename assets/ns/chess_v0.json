@@ -1,0 +1,35 @@
+{
+  "@context": {
+    "chess": "https://castling.club/ns/chess/v0#",
+    "san": "chess:san",
+    "fen": "chess:fen",
+    "game": {
+      "@id": "chess:game",
+      "@type": "@id"
+    },
+    "whiteActor": {
+      "@id": "chess:whiteActor",
+      "@type": "@id"
+    },
+    "blackActor": {
+      "@id": "chess:blackActor",
+      "@type": "@id"
+    },
+    "whiteUsername": "chess:whiteUsername",
+    "blackUsername": "chess:blackUsername",
+    "boardImage": "chess:boardImage",
+    "boardImageWhite": "chess:boardImageWhite",
+    "boardImageBlack": "chess:boardImageBlack",
+    "moveImage": "chess:moveImage",
+    "moveImageWhite": "chess:moveImageWhite",
+    "moveImageBlack": "chess:moveImageBlack",
+    "setupNote": {
+      "@id": "chess:setupNote",
+      "@type": "@id"
+    },
+    "moves": {
+      "@id": "chess:moveNotes",
+      "@type": "@id"
+    }
+  }
+}

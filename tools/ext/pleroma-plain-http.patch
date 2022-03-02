@@ -1,0 +1,13 @@
+diff --git a/lib/pleroma/web/web_finger/web_finger.ex b/lib/pleroma/web/web_finger/web_finger.ex
+index ecb39ee50..5a05c8575 100644
+--- a/lib/pleroma/web/web_finger/web_finger.ex
++++ b/lib/pleroma/web/web_finger/web_finger.ex
+@@ -211,7 +211,7 @@ defmodule Pleroma.Web.WebFinger do
+           String.replace(template, "{uri}", URI.encode(account))
+
+         _ ->
+-          "https://#{domain}/.well-known/webfinger?resource=acct:#{account}"
++          "http://#{domain}/.well-known/webfinger?resource=acct:#{account}"
+       end
+
+     with response <-

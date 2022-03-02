@@ -1,0 +1,65 @@
+<%- include("./_header.html.ejs") -%>
+
+<%
+  const {
+    whiteActor,
+    whiteUsername,
+    blackActor,
+    blackUsername,
+    setupNote,
+    badge,
+    moves
+  } = game
+  const lastNote = moves[moves.length - 1] || setupNote
+%>
+
+<h3>
+  ♙ <span class="h-card"><a clas="u-url" href="<%= whiteActor %>">@<span class="p-nickname"><%= whiteUsername %></span></a></span>
+  vs.
+  ♟ <span class="h-card"><a clas="u-url" href="<%= blackActor %>">@<span class="p-nickname"><%= blackUsername %></span></a></span>
+</h3>
+
+<blockquote class="moves">
+  <%= badge %>
+  <%
+  for (let idx = 0; idx < moves.length; idx += 2) {
+    const whiteNote = moves[idx]
+    const blackNote = moves[idx + 1]
+    %>
+    <span class="turn">
+      <strong><%= idx / 2 + 1 %>.</strong>
+      <a href="<%= whiteNote.id %>" class="white move"><%= whiteNote.san %></a>
+      <% if (blackNote) { %>
+        <a href="<%= blackNote.id %>" class="black move"><%= blackNote.san %></a>
+      <% } %>
+    </span>
+    <%
+  }
+  %>
+  <% if (moves.length === 0) { %>
+    —
+  <% } %>
+</blockquote>
+
+<p class="small align-right">
+  Started: <span class="time"><%= new Date(setupNote.published).toUTCString() %></span><br>
+  Last move: <span class="time"><%= new Date(lastNote.published).toUTCString() %></span>
+</p>
+
+<p class="chessboard">
+  <a href="<%= lastNote.boardImageWhite %>">
+    <img src="<%= lastNote.boardImageWhite %>">
+  </a>
+</p>
+
+<p class="small align-center">
+  <a href="https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation">FEN</a>:
+  <code><%= game.fen %></code><br>
+  <a href="<%= game.id %>?pgn">Download PGN</a> (experimental)
+</p>
+
+<p class="align-center">
+  <a href="/"><%= domain %></a>
+</p>
+
+<%- include("./_footer.html.ejs") -%>

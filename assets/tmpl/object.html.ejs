@@ -1,0 +1,43 @@
+<%- include("./_header.html.ejs") -%>
+
+<h3><span class="h-card"><a clas="u-url" href="/@king">@<span class="p-nickname">King</span></a></span> said:</h3>
+<p class="small">In reply to: <a href="<%= object.inReplyTo %>"><%= object.inReplyTo %></a></p>
+
+<blockquote><%- object.content %></blockquote>
+
+<div class="pagination">
+  <p class="align-left">
+    <% if (prevId) { %>
+      <a href="<%= prevId %>">« Previous move</a>
+    <% } %>
+  </p>
+  <p class="align-center">
+    <a href="<%= object.game %>">Full game</a>
+  </p>
+  <p class="align-right">
+    <% if (nextId) { %>
+      <a href="<%= nextId %>">Next move »</a>
+    <% } %>
+  </p>
+</div>
+
+<p class="small time align-right">
+  <%= new Date(object.published).toUTCString() %>
+</p>
+
+<p class="chessboard">
+  <a href="<%= object.moveImageWhite %>">
+    <img src="<%= object.moveImageWhite %>">
+  </a>
+</p>
+
+<p class="small align-center">
+  <a href="https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation">FEN</a>:
+  <code><%= object.fen %></code>
+</p>
+
+<p class="align-center">
+  <a href="/"><%= domain %></a>
+</p>
+
+<%- include("./_footer.html.ejs") -%>

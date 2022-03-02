@@ -1,0 +1,16 @@
+</div>
+
+<script>(function(){
+
+// Convert UTC times to local.
+var timeNodes = document.querySelectorAll('.time')
+for (var idx = 0; idx < timeNodes.length; idx++) {
+  var timeNode = timeNodes[idx]
+  var date = new Date(timeNode.textContent)
+  timeNode.textContent = date.toLocaleString()
+}
+
+})()</script>
+
+</body>
+</html>

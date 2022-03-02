@@ -1,0 +1,117 @@
+.container {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.small {
+  font-size: 80%;
+}
+
+.align-left {
+  text-align: left;
+}
+.align-center {
+  text-align: center;
+}
+.align-right {
+  text-align: right;
+}
+
+.pull-right {
+  float: right;
+}
+
+a {
+  margin: 0 -2px;
+  padding: 0 2px;
+  background: rgba(64, 64, 196, 0.1);
+  text-decoration: none;
+}
+a:hover {
+  background: rgba(64, 64, 196, 0.05);
+  text-decoration: underline;
+}
+
+pre {
+  white-space: pre-wrap;
+  border: 1px solid;
+  padding: 0.5rem;
+  font-size: 120%;
+}
+
+.usage,
+.usage ul {
+  padding: 0 0 0 1.5rem;
+}
+
+.usage > li {
+  margin: 2rem 0;
+}
+
+.challenge-board {
+  list-style: none;
+  display: block;
+  padding: 0;
+  text-align: center;
+}
+.challenge-board li {
+  display: inline-block;
+  margin: 0.3em 0.5em;
+  white-space: nowrap;
+}
+a.challenge,
+a.challenge:hover {
+  background: none;
+}
+
+.recent-games {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+.recent-games td {
+  vertical-align: baseline;
+}
+.recent-games .time {
+  text-align: right;
+}
+
+blockquote {
+  margin: 0;
+  border: 1px solid;
+  padding: 0.5rem;
+  font-size: 120%;
+}
+
+blockquote p {
+  margin: 0.5rem 0;
+}
+
+.pagination {
+  display: flex;
+  flex-flow: row;
+}
+.pagination p {
+  flex: 1 0;
+  margin-bottom: 0;
+}
+
+.chessboard {
+  text-align: center;
+}
+.chessboard a,
+.chessboard a:hover {
+  background: transparent;
+}
+.chessboard img {
+  max-height: 60vh;
+  max-width: 100%;
+}
+
+.moves {
+  line-height: 1.5;
+}
+.turn,
+.turn strong,
+.move {
+  margin-right: 0.2rem;
+}

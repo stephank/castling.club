@@ -1,0 +1,11 @@
+/.pnp.*
+/.yarn/*
+!/.yarn/plugins
+!/.yarn/releases
+
+/*.tgz
+/.env
+/dist
+/signing-key
+/signing-key.pub
+/tsconfig.tsbuildinfo

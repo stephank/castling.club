@@ -1,0 +1,96 @@
+<%- include("./_header.html.ejs") -%>
+
+<% const tootLink = text => `web+mastodon://share?text=${encodeURIComponent(text)}` %>
+
+<h1><%= domain %></h1>
+<p>Challenge someone to a game of chess using toots!</p>
+
+<ol class="usage">
+
+  <li>
+    <p>
+      Grab a <a href="https://mastodon.social/">Mastodon</a> account and
+      <a href="<%= tootLink(`@king@${domain} I challenge `) %>">
+        toot <strong>@king@<%= domain %></strong></a>, for example:
+    </p>
+
+    <pre>@king@<%= domain %> I challenge @Gargron!</pre>
+
+    <ul class="small">
+      <li>(Any sentence will work, as long as it has the word 'challenge' and one other mention)</li>
+      <li>(You can, of course, use any ActivityPub-compatible microblogging service)</li>
+    </ul>
+  </li>
+
+  <li>
+    <p>
+      Then simply reply with your move when it's your turn using
+      <a href="https://en.wikipedia.org/wiki/Algebraic_notation_(chess)">standard algebraic notation</a>
+    </p>
+
+    <pre>@king@<%= domain %> @Gargron e4. I will have your crown!</pre>
+
+    <ul class="small">
+      <li>(Your reply must start with the move, following any mentions)</li>
+      <li>(Sides are picked at random when you challenge someone)</li>
+    </ul>
+  </li>
+
+</ol>
+
+<h3>Open for challenges</h3>
+<p>
+  These players have indicated that they are open for challenges:
+  (click ⚔️ to toot a challenge)
+</p>
+<ul class="challenge-board">
+  <% if (challengeBoard.length === 0) { %>
+    <li>(No players at this time)</li>
+  <% } else { %>
+    <% for (const entry of challengeBoard) { %>
+      <li>
+        <a href="<%= entry.actorId %>">@<%= entry.actorName %></a>
+        <% if (entry.actorFullName) { %>
+          <a
+            class="challenge small"
+            href="<%= tootLink(`@king@${domain} I challenge @${entry.actorFullName}`) %>"
+          >⚔️</a>
+        <% } %>
+      </li>
+    <% } %>
+  <% } %>
+</ul>
+
+<p>
+  Get yourself on this list by
+    <a href="<%= tootLink(`@king@${domain} I'm open for challenges!`) %>">tooting</a>:
+</p>
+<pre>@king@<%= domain %> I'm open for challenges!</pre>
+
+<h3>Recent games</h3>
+<table class="recent-games">
+  <tbody>
+    <% for (const game of recentGames) { %>
+      <tr>
+        <td>
+          <a href="/games/<%= game.id %>">♙ @<%= game.whiteName %> vs. ♟ @<%= game.blackName %></a>
+          <span class="small">(turn <%= Math.floor(game.numMoves / 2) + 1 %>)</span>
+        </td>
+        <td class="small time">
+          <%= game.updatedAt.toUTCString() %>
+        </td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>
+
+<p class="align-right">
+  Created by <a href="https://mastodon.social/@kosinus">Stéphan Kochen</a>
+</p>
+<p class="small align-right">
+  Chess pieces by <a href="https://en.wikipedia.org/wiki/User:Cburnett/GFDL_images/Chess">Colin M.L. Burnett</a><br>
+  Uses <a href="https://github.com/jhlywa/chess.js">chess.js</a> under the hood<br>
+  <a href="https://github.com/stephank/castling.club">Source code</a>
+</p>
+
+<%- include("./_footer.html.ejs") -%>
