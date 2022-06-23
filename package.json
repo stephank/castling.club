@@ -16,7 +16,7 @@
     "fmt": "prettier --write . !.yarn",
     "prepack": "yarn build"
   },
-  "packageManager": "yarn@3.2.0",
+  "packageManager": "yarn@3.2.1",
   "files": [
     "./dist/**",
     "./assets/css/*",
