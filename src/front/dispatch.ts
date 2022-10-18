@@ -1,9 +1,9 @@
 import createDebug from "debug";
 
-import { InboxCtrl, ObjectExt } from "./inbox";
-import { GameCtrl } from "./game";
-import { ChallengeBoardCtrl } from "./challengeBoard";
-import { detach } from "../util/misc";
+import { InboxCtrl, ObjectExt } from "./inbox.js";
+import { GameCtrl } from "./game.js";
+import { ChallengeBoardCtrl } from "./challengeBoard.js";
+import { detach } from "../util/misc.js";
 
 export type DispatchCtrl = void;
 

@@ -2,7 +2,7 @@
 
 import fs from "fs";
 
-import draw from "./front/draw";
+import draw from "./front/draw.js";
 
 const main = async (): Promise<void> => {
   // Create stubs.

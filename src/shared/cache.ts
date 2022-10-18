@@ -1,7 +1,7 @@
 import createDebug from "debug";
 import { Store } from "keyv";
 
-import { Pg } from "../util/q";
+import { Pg } from "../util/q.js";
 
 export interface CacheStore<T> extends Store<T> {
   get(id: string): Promise<T | undefined>;

@@ -1,17 +1,17 @@
 import assert from "assert";
 
-import q from "../util/q";
-import { CONFIRMATIONS } from "../util/consts";
-import { ObjectExt } from "./inbox";
-import { OutboxCtrl } from "./outbox";
-import { createElement as h, createMention, render } from "../util/html";
-import { sample } from "../util/misc";
+import q from "../util/q.js";
+import { CONFIRMATIONS } from "../util/consts.js";
+import { ObjectExt } from "./inbox.js";
+import { OutboxCtrl } from "./outbox.js";
+import { createElement as h, createMention, render } from "../util/html.js";
+import { sample } from "../util/misc.js";
 
 import {
   Pg,
   insertOrBumpChallengeBoard,
   removeFromChallengeBoard,
-} from "../util/model";
+} from "../util/model.js";
 
 export interface ChallengeBoardCtrl {
   handleRequest(object: ObjectExt): Promise<void>;

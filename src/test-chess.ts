@@ -3,8 +3,8 @@
 
 import { assert } from "chai";
 
-import createGame from "./util/chess";
-import { words } from "./util/misc";
+import createGame from "./util/chess.js";
+import { words } from "./util/misc.js";
 
 describe("Checkmate", () => {
   const checkmates = [

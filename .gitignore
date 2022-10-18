@@ -4,9 +4,11 @@
 !/.yarn/releases
 
 /*.tgz
+/.direnv
 /.env
+/db
 /dist
+/result
 /signing-key
 /signing-key.pub
 /tsconfig.tsbuildinfo
-/result

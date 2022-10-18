@@ -1,13 +1,13 @@
 import Router from "@koa/router";
 
-import { readAsset } from "../util/fs";
+import { readAsset } from "../util/fs.js";
 
 import {
   AS_CONTEXT,
   AS_MIME,
   KOA_JSON_ACCEPTS,
   SEC_CONTEXT,
-} from "../util/consts";
+} from "../util/consts.js";
 
 export type ActorCtrl = void;
 

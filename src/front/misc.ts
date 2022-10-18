@@ -1,9 +1,9 @@
 import Router from "@koa/router";
 
-import { JSON_LD_MIME, TINY_CACHE_SEC } from "../util/consts";
-import { readAsset, renderTemplate } from "../util/fs";
+import { JSON_LD_MIME, TINY_CACHE_SEC } from "../util/consts.js";
+import { readAsset, renderTemplate } from "../util/fs.js";
 
-import { Pg, getChallengeBoard, getRecentGames } from "../util/model";
+import { Pg, getChallengeBoard, getRecentGames } from "../util/model.js";
 
 export type MiscCtrl = void;
 
@@ -22,8 +22,10 @@ export default async ({
   pg: Pg;
   router: Router;
 }): Promise<MiscCtrl> => {
-  const chessNs = JSON.parse(await readAsset("ns/chess_v0.json", "utf8"));
   const stylesheet = await readAsset("css/main.css");
+  const chessNs = JSON.parse(
+    (await readAsset("ns/chess_v0.json")).toString("utf8")
+  );
 
   // Serve the index page.
   router.get("/", async (ctx) => {

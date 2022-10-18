@@ -1,14 +1,13 @@
 import Router from "@koa/router";
 import assert from "assert";
 import crypto from "crypto";
-import path from "path";
 import { Context } from "koa";
 import { Image, createCanvas, loadImage, registerFont } from "canvas";
 
-import { ASSETS_BASE } from "../util/consts";
-import { CacheService } from "../shared/cache";
-import { PrettyMove } from "../util/chess";
-import { words } from "../util/misc";
+import { ASSETS_BASE } from "../util/consts.js";
+import { CacheService } from "../shared/cache.js";
+import { PrettyMove } from "../util/chess.js";
+import { words } from "../util/misc.js";
 
 export interface ImageUrls {
   boardImage: string;
@@ -75,8 +74,8 @@ const BOTTOM_MARGIN_CENTER = IMAGE_SIZE - HALF_MARGIN_SIZE;
 
 // Setup the label font.
 const FONT = "48px DejaVuSans";
-const fontPath = path.resolve(ASSETS_BASE, "DejaVuSans.ttf");
-registerFont(fontPath, { family: "DejaVuSans" });
+const fontPath = new URL("DejaVuSans.ttf", ASSETS_BASE);
+registerFont(fontPath.pathname, { family: "DejaVuSans" });
 
 export default async ({
   cache,
@@ -98,8 +97,8 @@ export default async ({
 
     const obj: { [piece: string]: Image } = {};
     for (const name of names) {
-      const imagePath = path.resolve(ASSETS_BASE, `img/${name}.png`);
-      obj[name] = await loadImage(imagePath);
+      const imagePath = new URL(`img/${name}.png`, ASSETS_BASE);
+      obj[name] = await loadImage(imagePath.pathname);
     }
     return obj;
   })();

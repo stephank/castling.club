@@ -4,9 +4,9 @@ import createDebug from "debug";
 import { Context } from "koa";
 import { v4 as uuid } from "uuid";
 
-import { ensureArray } from "../util/misc";
-import { extractText } from "../util/html";
-import { renderTemplate } from "../util/fs";
+import { ensureArray } from "../util/misc.js";
+import { extractText } from "../util/html.js";
+import { renderTemplate } from "../util/fs.js";
 
 import {
   AS,
@@ -14,7 +14,7 @@ import {
   AS_MIME,
   KOA_JSON_ACCEPTS,
   SHORT_CACHE_SEC,
-} from "../util/consts";
+} from "../util/consts.js";
 
 import {
   Pg,
@@ -25,7 +25,7 @@ import {
   getOutboxActivityById,
   getGameOverById,
   insertDelivery,
-} from "../util/model";
+} from "../util/model.js";
 
 export interface OutboxCtrl {
   createObject(pg: Pg, object: any): Promise<string>;

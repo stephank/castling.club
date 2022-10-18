@@ -1,7 +1,7 @@
 // Heavily modified version of chess.js v0.10.2.
 // See LICENSE.md for the original license.
 
-import { words } from "./misc";
+import { words } from "./misc.js";
 
 export type Color = "b" | "w";
 const BLACK = "b";

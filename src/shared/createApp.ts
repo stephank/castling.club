@@ -1,8 +1,8 @@
-import { Pool } from "pg";
+import pg from "pg";
 
-import cacheService, { CacheService } from "./cache";
-import jsonldService, { JsonLdService } from "./jsonld";
-import signingService, { SigningService } from "./signing";
+import cacheService, { CacheService } from "./cache.js";
+import jsonldService, { JsonLdService } from "./jsonld.js";
+import signingService, { SigningService } from "./signing.js";
 
 export interface AppConfig {
   env: string;
@@ -20,7 +20,7 @@ export interface BaseApp extends AppConfig {
   actorUrl: string;
   publicKeyUrl: string;
 
-  pg: Pool;
+  pg: pg.Pool;
 
   cache: CacheService;
   jsonld: JsonLdService;
@@ -58,7 +58,7 @@ export default async ({
   };
 
   // Instances of external dependencies.
-  app.pg = new Pool();
+  app.pg = new pg.Pool();
 
   // Parts of the app. These interconnect, so order is important.
   // (Basically poor-man's dependency injection.)

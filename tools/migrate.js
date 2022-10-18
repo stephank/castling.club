@@ -1,2 +1,3 @@
 #!/usr/bin/env node
-require("../dist/migrate").cli();
+import { cli } from "../dist/migrate.js";
+cli();

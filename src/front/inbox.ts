@@ -4,12 +4,12 @@ import createDebug from "debug";
 import createError from "http-errors";
 import { EventEmitter } from "events";
 
-import { AS } from "../util/consts";
-import { JsonLdService } from "../shared/jsonld";
-import { Pg, tryInsertInboxObject } from "../util/model";
-import { SigningService } from "../shared/signing";
-import { extractText } from "../util/html";
-import { originOf } from "../util/misc";
+import { AS } from "../util/consts.js";
+import { JsonLdService } from "../shared/jsonld.js";
+import { Pg, tryInsertInboxObject } from "../util/model.js";
+import { SigningService } from "../shared/signing.js";
+import { extractText } from "../util/html.js";
+import { originOf } from "../util/misc.js";
 
 import {
   Actor,
@@ -18,7 +18,7 @@ import {
   getActor,
   getObject,
   getTag,
-} from "../util/rdfModel";
+} from "../util/rdfModel.js";
 
 export interface ObjectExt extends Object {
   actor: Actor;

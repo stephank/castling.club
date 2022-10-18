@@ -2,17 +2,17 @@ import Koa from "koa";
 import Router from "@koa/router";
 import { Server } from "http";
 
-import createApp, { AppConfig, BaseApp } from "../shared/createApp";
-import { DEFAULT_CACHE_SEC } from "../util/consts";
+import createApp, { AppConfig, BaseApp } from "../shared/createApp.js";
+import { DEFAULT_CACHE_SEC } from "../util/consts.js";
 
-import actorCtrl, { ActorCtrl } from "./actor";
-import challengeBoardCtrl, { ChallengeBoardCtrl } from "./challengeBoard";
-import dispatchCtrl, { DispatchCtrl } from "./dispatch";
-import drawCtrl, { DrawCtrl } from "./draw";
-import gameCtrl, { GameCtrl } from "./game";
-import inboxCtrl, { InboxCtrl } from "./inbox";
-import miscCtrl, { MiscCtrl } from "./misc";
-import outboxCtrl, { OutboxCtrl } from "./outbox";
+import actorCtrl, { ActorCtrl } from "./actor.js";
+import challengeBoardCtrl, { ChallengeBoardCtrl } from "./challengeBoard.js";
+import dispatchCtrl, { DispatchCtrl } from "./dispatch.js";
+import drawCtrl, { DrawCtrl } from "./draw.js";
+import gameCtrl, { GameCtrl } from "./game.js";
+import inboxCtrl, { InboxCtrl } from "./inbox.js";
+import miscCtrl, { MiscCtrl } from "./misc.js";
+import outboxCtrl, { OutboxCtrl } from "./outbox.js";
 
 interface FrontApp extends BaseApp {
   koa: Koa;

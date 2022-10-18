@@ -2,7 +2,7 @@ import createDebug from "debug";
 import got from "got";
 import rdf from "@rdfjs/data-model";
 
-import {
+import type {
   Term,
   Quad,
   Quad_Subject,
@@ -14,15 +14,16 @@ import {
 import jsonldFactory, {
   Term as PlainTerm,
   Quad as PlainQuad,
-  IdentifierIssuer,
   ToRdfOptions,
   Processor,
 } from "jsonld";
 
-import { CacheService } from "./cache";
-import { TripleStore as PlainTripleStore } from "../util/rdf";
-import { JSON_ACCEPTS } from "../util/consts";
-import { checkPublicUrl } from "../util/misc";
+import { CacheService } from "./cache.js";
+import { TripleStore as PlainTripleStore } from "../util/rdf.js";
+import { JSON_ACCEPTS } from "../util/consts.js";
+import { checkPublicUrl } from "../util/misc.js";
+
+const { IdentifierIssuer } = jsonldFactory;
 
 export interface JsonLdService {
   createStore(): TripleStore;

@@ -1,15 +1,11 @@
 // A simple PostgreSQL migration runner.
 
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
-import { Client } from "pg";
-import { promisify } from "util";
-
-import { noop } from "./util/misc";
+import fs from "fs/promises";
+import pg from "pg";
 
 export type MigrationDirection = "up" | "down";
-export type MigrationFunction = (inject: { pg: Client }) => Promise<void>;
+export type MigrationFunction = (inject: { pg: pg.Client }) => Promise<void>;
 export type Migration = {
   [direction in MigrationDirection]: MigrationFunction;
 };
@@ -20,20 +16,24 @@ export interface MigrationRow {
 }
 
 export interface MigrationOptions {
-  before?(direction: MigrationDirection, row: MigrationRow): void;
-  after?(direction: MigrationDirection, row: MigrationRow): void;
+  before?(
+    direction: MigrationDirection,
+    row: MigrationRow
+  ): Promise<void> | void;
+  after?(
+    direction: MigrationDirection,
+    row: MigrationRow
+  ): Promise<void> | void;
 }
 
-const BASE_DIR = path.resolve(__dirname, "./migrations");
-
-const readdir = promisify(fs.readdir);
+const BASE_DIR = new URL("./migrations/", import.meta.url);
 
 class Runner {
-  private pg?: Client = undefined;
+  private pg?: pg.Client = undefined;
 
   async init() {
     if (!this.pg) {
-      this.pg = new Client();
+      this.pg = new pg.Client();
       await this.pg.connect();
     }
 
@@ -55,7 +55,7 @@ class Runner {
   async list(): Promise<MigrationRow[]> {
     const pg = this.pg!;
 
-    const allFiles = await readdir(BASE_DIR);
+    const allFiles = await fs.readdir(BASE_DIR);
     const files = allFiles.filter((name) => /^\d{3}_.+\.js$/.test(name)).sort();
 
     const { rows } = await pg.query<MigrationRow>({
@@ -77,11 +77,11 @@ class Runner {
     for (const row of rows) {
       await pg.query("begin");
       try {
-        await (options.before || noop)(direction, row);
-        const file = path.join(BASE_DIR, row.name);
-        const mod: Migration = require(file);
+        await options.before?.(direction, row);
+        const file = new URL(row.name, BASE_DIR);
+        const mod: Migration = await import(file.toString());
         await mod[direction]({ pg });
-        await (options.after || noop)(direction, row);
+        await options.after?.(direction, row);
       } catch (err) {
         await pg.query("rollback");
         throw err;
@@ -102,7 +102,7 @@ class Runner {
           text: 'insert into "migrations" ("name", "stamp") values ($1, $2)',
           values: [row.name, stamp],
         });
-        return (options.after || noop)(direction, row);
+        return options.after?.(direction, row);
       },
     });
     return todo;
@@ -124,7 +124,7 @@ class Runner {
           text: 'delete from "migrations" where "name" = $1',
           values: [row.name],
         });
-        return (options.after || noop)(direction, row);
+        return options.after?.(direction, row);
       },
     });
     return todo;

@@ -1,6 +1,6 @@
 import { NamedNode, BlankNode, Literal, Quad } from "rdf-js";
 
-import { XML, RDF } from "./consts";
+import { XML, RDF } from "./consts.js";
 
 export type Node = NamedNode | BlankNode;
 

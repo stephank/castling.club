@@ -16,7 +16,8 @@
     "fmt": "prettier --write . !.yarn",
     "prepack": "yarn build"
   },
-  "packageManager": "yarn@3.2.1",
+  "packageManager": "yarn@3.2.4",
+  "type": "module",
   "files": [
     "./dist/**",
     "./assets/css/*",
@@ -30,41 +31,37 @@
   "dependencies": {
     "@koa/router": "^10.0.0",
     "@rdfjs/data-model": "^1.2.0",
-    "@types/rdf-js": "^4.0.1",
     "canvas": "^2.7.0",
     "co-body": "^6.1.0",
     "debug": "^4.3.1",
-    "dotenv": "^10.0.0",
+    "dotenv": "^16.0.3",
     "ejs": "^3.1.6",
-    "got": "^11.8.2",
-    "http-errors": "^1.8.0",
-    "jsonld": "^5.2.0",
+    "got": "^12.5.2",
+    "http-errors": "^2.0.0",
+    "jsonld": "^8.1.0",
     "koa": "^2.13.1",
-    "leven": "^3.1.0",
-    "parse5": "^6.0.1",
+    "leven": "^4.0.0",
+    "parse5": "^7.1.1",
     "pg": "^8.6.0",
-    "uuid": "^8.3.2"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/chai": "^4.2.16",
-    "@types/co-body": "^5.1.0",
+    "@types/co-body": "^6.1.0",
     "@types/debug": "^4.1.5",
     "@types/ejs": "^3.0.6",
     "@types/http-errors": "^1.8.0",
     "@types/keyv": "^3.1.1",
     "@types/koa": "^2.13.1",
-    "@types/koa__router": "^8.0.4",
-    "@types/mocha": "^8.2.2",
-    "@types/node": "^15.14.0",
-    "@types/parse5": "^6.0.0",
-    "@types/pg": "^7.14.11",
+    "@types/koa__router": "^12.0.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^18.11.0",
+    "@types/pg": "^8.6.5",
+    "@types/rdf-js": "^4.0.1",
     "@types/uuid": "^8.3.0",
     "chai": "^4.3.4",
-    "mocha": "^9.1.0",
-    "prettier": "2.6.2",
-    "typescript": "4.6.4"
-  },
-  "resolutions": {
-    "@digitalbazaar/http-client": "link:dist/util/dummy"
+    "mocha": "^10.1.0",
+    "prettier": "2.7.1",
+    "typescript": "4.8.4"
   }
 }

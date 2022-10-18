@@ -1,4 +1,4 @@
-import { MigrationFunction } from "../migrate";
+import { MigrationFunction } from "../migrate.js";
 
 export const up: MigrationFunction = async ({ pg }) => {
   await pg.query(`

@@ -1,7 +1,7 @@
 // Functions that extract objects from the RDF store in our expected format.
 
-import { RDF, LDP, AS, SEC } from "./consts";
-import { TripleStore, nodes, node, anyText, englishText } from "./rdf";
+import { RDF, LDP, AS, SEC } from "./consts.js";
+import { TripleStore, nodes, node, anyText, englishText } from "./rdf.js";
 
 export interface Actor {
   id: string;

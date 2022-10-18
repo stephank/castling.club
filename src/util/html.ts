@@ -1,13 +1,18 @@
-import parse5, {
-  Node,
-  TextNode,
-  ParentNode,
-  ChildNode,
-  Element,
-  DocumentFragment,
+import {
+  parseFragment,
+  DefaultTreeAdapterMap as Types,
+  html,
+  serialize,
 } from "parse5";
 
-import { ensureArray } from "./misc";
+import { ensureArray } from "./misc.js";
+
+type Node = Types["node"];
+type Element = Types["element"];
+type ParentNode = Types["parentNode"];
+type ChildNode = Types["childNode"];
+type TextNode = Types["textNode"];
+type DocumentFragment = Types["documentFragment"];
 
 export interface Attrs {
   [name: string]: string;
@@ -26,15 +31,15 @@ export type VNode = VElement | VTextNode | undefined;
 // Reduce nodes to their text content.
 const extractTextFromNode = (node: Node): string =>
   node.nodeName === "#text"
-    ? (<TextNode>node).value
-    : ((<any>node).childNodes || []).reduce(
-        (memo: string, node: Node) => memo + extractTextFromNode(node),
+    ? (node as TextNode).value
+    : ((node as ParentNode).childNodes || []).reduce(
+        (memo: string, node) => memo + extractTextFromNode(node),
         ""
       ) + (node.nodeName === "p" ? "\n" : "");
 
 // Reduce HTML to its text content.
 export const extractText = (html: string): string =>
-  extractTextFromNode(<DocumentFragment>parse5.parseFragment(html)).replace(
+  extractTextFromNode(parseFragment(html)).replace(
     // eslint-disable-next-line no-control-regex
     /[\x00-\x09\x0b-\x1f\x7f]/g,
     ""
@@ -82,7 +87,7 @@ const toFragmentNode = (
     const result: Element = {
       nodeName: node.name,
       tagName: node.name,
-      namespaceURI: "",
+      namespaceURI: html.NS.HTML,
       attrs: [],
       parentNode,
       childNodes: [],
@@ -103,7 +108,7 @@ const toFragmentNode = (
 
 // Render nodes to HTML.
 export const render = (nodes: VNode | VNode[]): string =>
-  parse5.serialize(toFragment(nodes));
+  serialize(toFragment(nodes));
 
 const h = createElement;
 

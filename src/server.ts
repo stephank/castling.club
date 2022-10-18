@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 import fs from "fs";
 
-import deliver from "./deliver";
-import front from "./front";
+import deliver from "./deliver/index.js";
+import front from "./front/index.js";
 
 // Load configuration.
 dotenv.config();

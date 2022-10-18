@@ -3,11 +3,11 @@ import createDebug from "debug";
 import got from "got";
 import postgres from "pg";
 
-import { AS_MIME, JSON_ACCEPTS } from "../util/consts";
-import { JsonLdService } from "../shared/jsonld";
-import { SigningService } from "../shared/signing";
-import { checkPublicUrl, detach } from "../util/misc";
-import { getActor, getEndpoints } from "../util/rdfModel";
+import { AS_MIME, JSON_ACCEPTS } from "../util/consts.js";
+import { JsonLdService } from "../shared/jsonld.js";
+import { SigningService } from "../shared/signing.js";
+import { checkPublicUrl, detach } from "../util/misc.js";
+import { getActor, getEndpoints } from "../util/rdfModel.js";
 
 import {
   Pg,
@@ -20,7 +20,7 @@ import {
   deleteDeliveriesByAddressees,
   getNextDelivery,
   transact,
-} from "../util/model";
+} from "../util/model.js";
 
 export type DeliverCtrl = void;
 

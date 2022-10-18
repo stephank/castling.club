@@ -31,12 +31,6 @@ export const ns =
   (name: string): string =>
     prefix + name;
 
-// No-op function.
-export const noop = (): void => {};
-
-// Identity function.
-export const identity = <T>(x: T): T => x;
-
 // Coerce a value into an array.
 export const ensureArray = <T>(value: T | T[]): T[] =>
   value == null ? [] : Array.isArray(value) ? value : [value];
@@ -67,7 +61,7 @@ export const detach =
     fn: F
   ): ((...args: ArgumentsOf<F>) => Promise<void>) =>
   async (...args) =>
-    fn(...args).then(exports.noop, (err) => {
+    fn(...args).catch((err) => {
       console.error(err);
     });
 

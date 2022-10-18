@@ -1,22 +1,17 @@
 import ejs from "ejs";
-import fs from "fs";
-import path from "path";
-import { promisify } from "util";
+import fs from "fs/promises";
 
-const { ASSETS_BASE } = require("./consts");
-
-// Promise version of `fs.readFile`.
-export const readFile = promisify(fs.readFile);
+import { ASSETS_BASE } from "./consts.js";
 
 // Wrap `readFile` to read from the asset directory.
-export const readAsset = async (file: string, encoding?: string) =>
-  exports.readFile(path.resolve(ASSETS_BASE, file), encoding);
+export const readAsset = async (file: string) =>
+  fs.readFile(new URL(file, ASSETS_BASE));
 
 // Render a template.
 export const renderTemplate = async (name: string, data: any) =>
   new Promise((resolve, reject) => {
-    const tmplPath = path.resolve(ASSETS_BASE, "tmpl", `${name}.html.ejs`);
-    ejs.renderFile(tmplPath, data, (err, res) => {
+    const tmplPath = new URL(`tmpl/${name}.html.ejs`, ASSETS_BASE);
+    ejs.renderFile(tmplPath.pathname, data, (err, res) => {
       err ? reject(err) : resolve(res);
     });
   });

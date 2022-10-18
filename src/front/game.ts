@@ -5,16 +5,16 @@ import leven from "leven";
 import { Context } from "koa";
 import { v4 as uuid } from "uuid";
 
-import createGame, { Game, PrettyMove } from "../util/chess";
-import { DrawCtrl } from "./draw";
-import { JsonLdService } from "../shared/jsonld";
-import { ObjectExt } from "./inbox";
-import { OutboxCtrl } from "./outbox";
-import { createElement as h, createMention, render } from "../util/html";
-import { getActor } from "../util/rdfModel";
-import { renderPgn } from "../util/pgn";
-import { renderTemplate } from "../util/fs";
-import { sample, sortBy } from "../util/misc";
+import createGame, { Game, PrettyMove } from "../util/chess.js";
+import { DrawCtrl } from "./draw.js";
+import { JsonLdService } from "../shared/jsonld.js";
+import { ObjectExt } from "./inbox.js";
+import { OutboxCtrl } from "./outbox.js";
+import { createElement as h, createMention, render } from "../util/html.js";
+import { getActor } from "../util/rdfModel.js";
+import { renderPgn } from "../util/pgn.js";
+import { renderTemplate } from "../util/fs.js";
+import { sample, sortBy } from "../util/misc.js";
 
 import {
   AS,
@@ -26,7 +26,7 @@ import {
   SHORT_CACHE_SEC,
   UNICODE_BADGES,
   UNICODE_PIECES,
-} from "../util/consts";
+} from "../util/consts.js";
 
 import {
   Pg,
@@ -39,7 +39,7 @@ import {
   updateGame,
   getOutboxMovesByGame,
   removeFromChallengeBoard,
-} from "../util/model";
+} from "../util/model.js";
 
 export interface GameCtrl {
   handleChallenge(object: ObjectExt): Promise<void>;

@@ -1,12 +1,15 @@
-import q, { Pg, QueryResult } from "./q";
+import q, { Pg, QueryResult, QueryResultRow } from "./q.js";
 
 export { Pg };
 export const transact = q.transact;
 
 // Convenience type for a promise for a query result.
-export type QueryPromise<T> = Promise<QueryResult<T>>;
+export type QueryPromise<T extends QueryResultRow> = Promise<QueryResult<T>>;
 // Base signature of all our query functions.
-export type QueryFunction<T> = (pg: Pg, ...args: any[]) => QueryPromise<T>;
+export type QueryFunction<T extends QueryResultRow> = (
+  pg: Pg,
+  ...args: any[]
+) => QueryPromise<T>;
 // Given a query function, gets the type of rows returned.
 export type QueryReturn<F> = F extends QueryFunction<infer T> ? T : never;
 

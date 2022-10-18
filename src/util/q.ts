@@ -1,10 +1,10 @@
-import { ClientBase, Pool, QueryResult } from "pg";
 import createDebug from "debug";
+import type { ClientBase, Pool, QueryResult, QueryResultRow } from "pg";
 
 const debug = createDebug("chess:query");
 
 export type Pg = ClientBase | Pool;
-export { QueryResult };
+export type { QueryResult, QueryResultRow };
 
 let _pg: Pg | undefined;
 
@@ -22,7 +22,7 @@ const q = (pg: Pg) => {
   return _q;
 };
 
-const _q = async <T>(
+const _q = async <T extends QueryResultRow>(
   strings: TemplateStringsArray,
   ...values: any[]
 ): Promise<QueryResult<T>> => {

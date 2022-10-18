@@ -3,9 +3,9 @@ import crypto from "crypto";
 import { BeforeRequestHook } from "got";
 import { Context } from "koa";
 
-import { TripleStore } from "./jsonld";
-import { PublicKey, getPublicKey } from "../util/rdfModel";
-import { ensureArray } from "../util/misc";
+import { TripleStore } from "./jsonld.js";
+import { PublicKey, getPublicKey } from "../util/rdfModel.js";
+import { ensureArray } from "../util/misc.js";
 
 export interface SigningService {
   verify(ctx: Context, body: string, store: TripleStore): Promise<PublicKey>;
@@ -201,7 +201,7 @@ export default async ({
       const { method, url } = options;
       const signedHeaders = Object.keys(options.headers);
       const signedData = [
-        `(request-target): ${method.toLowerCase()} ${url.pathname}`,
+        `(request-target): ${method.toLowerCase()} ${(url as URL).pathname}`,
         ...signedHeaders.map(
           (name) => `${name.toLowerCase()}: ${options.headers[name]}`
         ),

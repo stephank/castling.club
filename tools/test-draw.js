@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-require("../dist/test-draw");
+import "../dist/test-draw";

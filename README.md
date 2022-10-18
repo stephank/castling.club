@@ -10,7 +10,7 @@ it! Send me a toot: [@kosinus@mastodon.social]
 
 ## How to run
 
-To run the app, you need [Node.js] (at least 10.x), [Yarn], and [PostgreSQL] (at
+To run the app, you need [Node.js] (at least 16.x), [Yarn], and [PostgreSQL] (at
 least 9.6).
 
 First, install the dependencies and build the TypeScript code:

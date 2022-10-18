@@ -1,6 +1,6 @@
-import createApp, { BaseApp, AppConfig } from "../shared/createApp";
+import createApp, { BaseApp, AppConfig } from "../shared/createApp.js";
 
-import deliverCtrl, { DeliverCtrl } from "./deliver";
+import deliverCtrl, { DeliverCtrl } from "./deliver.js";
 
 export interface DeliverApp extends BaseApp {
   deliver: DeliverCtrl;
