@@ -13,8 +13,8 @@
 
         nodejs = final.nodejs-18_x;
 
-        buildInputs = with final; (
-          [ python3 pkg-config pixman cairo pango libjpeg postgresql ]
+        canvasBuildInputs = with final; (
+          [ python3 pkg-config pixman cairo pango libjpeg ]
           ++ optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks;
             [ CoreText xcbuild ]
           )
@@ -25,10 +25,12 @@
         } {
           src = ./.;
           overrideAttrs = old: {
-            buildInputs = old.buildInputs ++ buildInputs;
             buildPhase = "yarn build";
             checkPhase = "yarn test";
             doCheck = true;
+          };
+          overrideCanvasAttrs = old: {
+            buildInputs = old.buildInputs ++ canvasBuildInputs;
           };
         };
 
@@ -37,7 +39,8 @@
         castling-club.defaultPackage = package;
 
         castling-club.devShell = final.mkShell {
-          buildInputs = buildInputs
+          buildInputs = (with final; [ postgresql ])
+            ++ canvasBuildInputs
             ++ [ nodejs package.yarn-freestanding ];
         };
 
