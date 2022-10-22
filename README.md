@@ -51,8 +51,7 @@ need to be tweaked. The following variables are used (with their defaults):
   the 'King' actor. A matching file with a `.pub` suffix MUST be present,
   containing the RSA public key (also in PEM format).
 
-  The default matches the `tools/gen-signing-key.sh` script, and should be fine
-  in most cases.
+  Use `tools/gen-signing-key.sh <filename>` to generate a pair.
 
 - `APP_HMAC_SECRET="INSECURE"`
 
@@ -68,8 +67,9 @@ need to be tweaked. The following variables are used (with their defaults):
 
   One of `development` or `production`.
 
-  When in `production`, the app will reject federation attempts not over HTTPS,
-  or from origins that should not appear on the open Fediverse.
+  It's important to set this to `production` on a live instance. When not in
+  production, the app will not enforce, but only warn about security issues.
+  (E.g. invalid request signatures, and federation over non-HTTPS.)
 
   This variable may also change various behaviour in library dependencies.
 
@@ -86,7 +86,7 @@ need to be tweaked. The following variables are used (with their defaults):
 Now generate the signing key:
 
 ```sh
-./tools/gen-signing-key.sh
+./tools/gen-signing-key.sh signing-key
 ```
 
 Make sure the database exists in PostgreSQL, then create the schema:

@@ -39,7 +39,7 @@ const BASE_DELAY = 10 * 1000;
 const debug = createDebug("chess:deliver");
 
 export default async ({
-  env,
+  isDev,
   origin,
   publicKeyUrl,
   privateKeyPem,
@@ -47,7 +47,7 @@ export default async ({
   jsonld,
   signing,
 }: {
-  env: string;
+  isDev: boolean;
   origin: string;
   publicKeyUrl: string;
   privateKeyPem: string;
@@ -112,11 +112,11 @@ export default async ({
       }
     }
 
-    if (inbox && (env !== "production" || checkPublicUrl(inbox))) {
+    if (inbox && checkPublicUrl(inbox, "shared inbox", isDev)) {
       debug(`Resolved ${addressee}, shared inbox: ${inbox}`);
     } else {
       inbox = actor.inbox;
-      if (inbox && (env !== "production" || checkPublicUrl(inbox))) {
+      if (inbox && checkPublicUrl(inbox, "actor inbox", isDev)) {
         debug(`Resolved ${addressee}, personal inbox: ${inbox}`);
       } else {
         console.warn(

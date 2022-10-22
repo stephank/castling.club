@@ -95,18 +95,18 @@ export class TripleStore extends PlainTripleStore {
 
 export default async ({
   cache,
-  env,
+  isDev,
   origin,
 }: {
   cache: CacheService;
-  env: string;
+  isDev: boolean;
   origin: string;
 }): Promise<JsonLdService> => {
   const jsonld = jsonldFactory();
 
   // Setup JSON-LD to use 'got' with caching.
   jsonld.documentLoader = async (url: string) => {
-    if (env === "production" && !checkPublicUrl(url)) {
+    if (!checkPublicUrl(url, "JSON-LD document", isDev)) {
       return null;
     }
 

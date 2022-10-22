@@ -23,7 +23,7 @@ const publicKeyPem = fs.readFileSync(`${keyFile}.pub`, "utf-8");
 
 // Build the configuration object.
 const config = {
-  env,
+  isDev: env !== "production",
   scheme,
   domain,
   adminUrl,
@@ -32,6 +32,9 @@ const config = {
   privateKeyPem,
   hmacSecret,
 };
+if (config.isDev) {
+  console.warn(`DEV MODE enabled, security checks disabled!`);
+}
 
 // Create the front instance.
 front(config).then((instance) => {

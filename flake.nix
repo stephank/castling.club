@@ -11,15 +11,18 @@
       name = "castling-club";
       overlay = final: prev: let
 
+        # Major Node.js version.
         nodejs = final.nodejs-18_x;
 
-        canvasBuildInputs = with final; (
+        # Packages required to build the `canvas` npm package.
+        canvasDeps = with final; (
           [ python3 pkg-config pixman cairo pango libjpeg ]
           ++ optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks;
             [ CoreText xcbuild ]
           )
         );
 
+        # Import and amend the app build from yarn-plugin-nixify.
         package = prev.callPackage ./yarn-project.nix {
           inherit nodejs;
         } {
@@ -30,19 +33,24 @@
             doCheck = true;
           };
           overrideCanvasAttrs = old: {
-            buildInputs = old.buildInputs ++ canvasBuildInputs;
+            buildInputs = old.buildInputs ++ canvasDeps;
           };
         };
 
       in {
 
+        # For `nix build`
         castling-club.defaultPackage = package;
 
+        # For `nix develop`
         castling-club.devShell = final.mkShell {
           buildInputs = (with final; [ postgresql ])
-            ++ canvasBuildInputs
+            ++ canvasDeps
             ++ [ nodejs package.yarn-freestanding ];
         };
+
+        # For `nix flake check`
+        castling-club.checks.default = import ./functional-test/run.nix final;
 
       };
     };

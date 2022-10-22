@@ -1,6 +1,6 @@
 import { ns, words } from "./misc.js";
 
-export const ASSETS_BASE = new URL("../../assets/", import.meta.url)
+export const ASSETS_BASE = new URL("../../assets/", import.meta.url);
 
 // Various RDF namespaces used.
 export const XML = ns("http://www.w3.org/2001/XMLSchema#");

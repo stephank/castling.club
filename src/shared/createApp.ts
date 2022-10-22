@@ -5,7 +5,7 @@ import jsonldService, { JsonLdService } from "./jsonld.js";
 import signingService, { SigningService } from "./signing.js";
 
 export interface AppConfig {
-  env: string;
+  isDev: boolean;
   scheme: string;
   domain: string;
   adminUrl: string;
@@ -28,7 +28,7 @@ export interface BaseApp extends AppConfig {
 }
 
 export default async ({
-  env,
+  isDev,
   scheme,
   domain,
   adminUrl,
@@ -44,7 +44,7 @@ export default async ({
 
   // Main application object.
   const app = <BaseApp>{
-    env,
+    isDev,
     scheme,
     domain,
     adminUrl,

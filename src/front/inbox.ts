@@ -33,11 +33,13 @@ export interface InboxCtrl extends EventEmitter {
 const debug = createDebug("chess");
 
 export default async ({
+  isDev,
   jsonld,
   pg,
   router,
   signing,
 }: {
+  isDev: boolean;
   jsonld: JsonLdService;
   pg: Pg;
   router: Router;
@@ -77,9 +79,19 @@ export default async ({
     }
 
     // Verify the actor signature.
-    const publicKey = await signing.verify(ctx, raw, store);
-    if (publicKey.owner !== activity.actor) {
-      throw createError(400, "Signature does not match actor");
+    try {
+      const publicKey = await signing.verify(ctx, raw, store);
+      if (publicKey.owner !== activity.actor) {
+        throw createError(400, "Signature does not match actor");
+      }
+    } catch (err: any) {
+      if (isDev) {
+        console.warn(
+          `DEV MODE: Would reject signature in production: ${err.message}`
+        );
+      } else {
+        throw err;
+      }
     }
 
     // Verify the activity is from the actor's origin.
@@ -105,7 +117,7 @@ export default async ({
     if (rowCount === 0) {
       debug(`Ignoring duplicate activity: ${activity.id}`);
       ctx.status = 202;
-      ctx.body = null;
+      ctx.body = "";
       return;
     }
 
@@ -149,7 +161,7 @@ export default async ({
     }
 
     ctx.status = 202;
-    ctx.body = null;
+    ctx.body = "";
   });
 
   return inbox;

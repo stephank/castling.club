@@ -73,10 +73,18 @@ export const originOf = (url: string): string | undefined => {
 
 // Checks that a URL that is supposed to be some resource on the public
 // internet doesn't point to known invalid hosts. We also require HTTPS.
-export const checkPublicUrl = (url: string): boolean => {
+export const checkPublicUrl = (
+  url: string,
+  descr: string,
+  devMode = false
+): boolean => {
+  const invalidMsg =
+    devMode && `DEV MODE: Would reject ${descr} URL in production: ${url}`;
+
   // Filter non-HTTPS URLs.
   if (url.slice(0, 8) !== "https://") {
-    return false;
+    devMode && console.warn(invalidMsg);
+    return devMode;
   }
 
   // We want a valid domain, not an IP address. The invalid character list
@@ -88,13 +96,15 @@ export const checkPublicUrl = (url: string): boolean => {
     isIPv4(host) ||
     [...host].find((c) => INVALID_HOST_CHARS.has(c))
   ) {
-    return false;
+    devMode && console.warn(invalidMsg);
+    return devMode;
   }
 
   // Filter reserved TLDs.
   const tld = host.split(".").pop();
   if (!tld || INVALID_TLDS.has(tld)) {
-    return false;
+    devMode && console.warn(invalidMsg);
+    return devMode;
   }
 
   return true;
