@@ -10,6 +10,8 @@ runCommand "test" {
 } ''
   set -xeuo pipefail
 
+  # Use a Unix socket in our build dir.
+  export PGHOST="$PWD/db"
   # Needed because $USER is not set.
   export PGUSER="$(id -nu)"
 
@@ -18,7 +20,7 @@ runCommand "test" {
 
   # Initialize and start PostgreSQL.
   initdb -D db
-  postgres -D db &
+  postgres -D db -k "$PGHOST" &
 
   # Terminate background jobs on exit.
   trap 'jobs -p | xargs kill; wait' EXIT
@@ -26,7 +28,7 @@ runCommand "test" {
   # Wait for PostgreSQL to complete startup.
   checkPort() {
     declare -i tries=0
-    while ! 2> /dev/null > /dev/tcp/::1/$1; do
+    while ! 2> /dev/null > /dev/tcp/127.0.0.1/$1; do
       if (( ++tries >= 10 )); then
         echo "Timed out"
         exit 1

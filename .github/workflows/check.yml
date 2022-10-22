@@ -1,0 +1,22 @@
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v18
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "yarn"
+
+      # Partial Yarn install for preloading.
+      - run: yarn --mode=skip-build
+
+      # Run tests.
+      - run: nix flake check -v -L

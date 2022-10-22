@@ -4,8 +4,8 @@
 // expects the server to be running with roughly defaults, except
 // APP_DOMAIN="localhost:5080".
 //
-// Note this script is run outside of the source tree in CI, so dependencies are
-// not available.
+// Note this script is run outside of the source tree in CI, so dependencies
+// are not available.
 
 import assert from "node:assert";
 import crypto from "node:crypto";
@@ -13,6 +13,40 @@ import http from "node:http";
 
 const origin = "http://localhost:5081";
 const appOrigin = "http://localhost:5080";
+
+// CI runs this in a Nix sandbox, so we can't access the network.
+// We can get by with a super simple JSON-LD context.
+const context = { "@context": `${origin}/context.json` };
+const contextDoc = {
+  "@context": {
+    as: "https://www.w3.org/ns/activitystreams#",
+    ldp: "http://www.w3.org/ns/ldp#",
+    id: "@id",
+    type: "@type",
+    inbox: {
+      "@id": "ldp:inbox",
+      "@type": "@id",
+    },
+    // ActivityStreams string properties.
+    ...Object.fromEntries(
+      [
+        "Person",
+        "Note",
+        "Mention",
+        "Create",
+        "content",
+        "preferredUsername",
+        "name",
+      ].map((prop) => [prop, `as:${prop}`])
+    ),
+    // ActivityStreams relation properties.
+    ...Object.fromEntries(
+      ["actor", "object", "attributedTo", "inReplyTo", "tag", "to", "href"].map(
+        (prop) => [prop, { "@id": `as:${prop}`, "@type": "@id" }]
+      )
+    ),
+  },
+};
 
 /** A simple queue for the inbox of an actor. */
 class Inbox {
@@ -69,9 +103,12 @@ const actorB = {
 const server = http.createServer((req, res) => {
   let body = null;
   switch (`${req.method} ${req.url}`) {
+    case "GET /context.json":
+      body = contextDoc;
+      break;
     case "GET /actors/A":
       body = {
-        "@context": "https://www.w3.org/ns/activitystreams",
+        ...context,
         id: actorA.id,
         type: "Person",
         preferredUsername: "A",
@@ -80,7 +117,7 @@ const server = http.createServer((req, res) => {
       break;
     case "GET /actors/B":
       body = {
-        "@context": "https://www.w3.org/ns/activitystreams",
+        ...context,
         id: actorB.id,
         type: "Person",
         preferredUsername: "B",
@@ -124,7 +161,7 @@ try {
       ...acceptJson,
       method: "POST",
       body: JSON.stringify({
-        "@context": "https://www.w3.org/ns/activitystreams",
+        ...context,
         id: `${origin}/posts/${noteId}/activity`,
         type: "Create",
         actor: from.id,
@@ -138,7 +175,10 @@ try {
       }),
     });
     if (res.status !== 202) {
-      throw Error(`Unexpected status on King's inbox: ${res.statusText}`);
+      throw Error(
+        `Unexpected status on King's inbox: ${res.status}\n` +
+          (await res.text())
+      );
     }
     // Pull from both inboxes, but we care about just one.
     const [activity] = await Promise.all([from.inbox.pull(), to.inbox.pull()]);
