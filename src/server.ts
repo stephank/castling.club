@@ -8,7 +8,7 @@ import front from "./front/index.js";
 dotenv.config();
 const {
   APP_SCHEME: scheme = "http",
-  APP_DOMAIN: domain = "chess.test",
+  APP_DOMAIN: domain = "localhost:5080",
   APP_ADMIN_URL: adminUrl = "",
   APP_ADMIN_EMAIL: adminEmail = "",
   APP_KEY_FILE: keyFile = "signing-key",

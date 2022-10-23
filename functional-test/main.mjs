@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
 // This script tests the castling.club server by playing a simple game. It
-// expects the server to be running with roughly defaults, except
-// APP_DOMAIN="localhost:5080".
+// expects the server to be running with defaults.
 //
 // Note this script is run outside of the source tree in CI, so dependencies
 // are not available.

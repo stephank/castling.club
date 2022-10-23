@@ -6,7 +6,6 @@ let
 in
 runCommand "test" {
   nativeBuildInputs = [ app openssl postgresql ];
-  APP_DOMAIN="localhost:5080";
 } ''
   set -xeuo pipefail
 

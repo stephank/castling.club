@@ -23,15 +23,15 @@ yarn build
 Next, you should configure the app.
 
 Configuration is provided through environment variables, which can also be
-provided in a `.env` file. The defaults may work for development, but usually
-need to be tweaked. The following variables are used (with their defaults):
+provided in a `.env` file. The defaults should work for development. The
+following variables are used (with their defaults):
 
 - `APP_SCHEME="http"`
 
   The scheme used to access the app. The app only talks plain HTTP, but this
   should be set to `https` when behind a reverse proxy providing HTTPS.
 
-- `APP_DOMAIN="chess.test"`
+- `APP_DOMAIN="localhost:5080"`
 
   The domain used to access the app. You should set up a virtual host matching
   this, and have it proxy to the app.
