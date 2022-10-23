@@ -108,25 +108,6 @@ castling.club's own debug logging can be enabled using, for example:
 DEBUG='chess:*' yarn start
 ```
 
-## Testing interaction in development
-
-With some work, it's possible to run local castling.club, Mastodon and Pleroma
-instances talking to each other. A simple setup might have:
-
-- castling.club running as `chess.test`
-- Mastodon running as `mastodon.test`
-- Pleroma running as `pleroma.test`
-
-To get this working, you want a webserver configured with these virtual hosts
-running in front, and correctly reverse proxying to each app. The hosts can then
-be defined in your `/etc/hosts` file, or a custom DNS server with a wildcard
-`*.test` domain, to point at the local machine (`127.0.0.1` / `::1`).
-
-Both Mastodon and Pleroma perform Webfinger requests over HTTPS. You can either
-setup HTTPS for all your local testing instances, or patch either project to use
-plain HTTP. ([Mastodon patch], [Pleroma patch]. You MUST NOT ever run such a
-patched codebase in a public instance.)
-
 ## App structure
 
 The `server.js` entry point loads configuration, then starts the two main tasks
