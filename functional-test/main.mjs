@@ -98,6 +98,12 @@ const actorB = {
   inbox: new Inbox(),
 };
 
+// For logging.
+const displayNames = {
+  [actorA.id]: "A",
+  [actorB.id]: "B",
+};
+
 // Minimal ActivityPub server that handles requests from the app.
 const server = http.createServer((req, res) => {
   let body = null;
@@ -147,15 +153,35 @@ try {
   let res = await fetch(`${appOrigin}/.well-known/webfinger?resource=king`);
   const { links } = await res.json();
   const king = links[0].href;
+  displayNames[king] = "king";
 
   // Find the inbox for King.
   res = await fetch(king, acceptJson);
   const { inbox } = await res.json();
 
+  // Helper: Log contents of a note.
+  function logObject(object) {
+    const displayName =
+      displayNames[object.attributedTo] || object.attributedTo;
+    const text = object.content
+      .replaceAll("</p>", "\n")
+      .replace(/<.+?>/g, "")
+      .trim();
+    console.log(`\n--- @${displayName}\n${text}`);
+  }
+
   // Helper: Send a note to King.
   async function sendToKing(from, to, object) {
-    console.log(">>", object.content);
     const noteId = crypto.randomUUID();
+    object = {
+      ...object,
+      id: `${origin}/posts/${noteId}`,
+      type: "Note",
+      attributedTo: from.id,
+      to: [king, to.id],
+    };
+    logObject(object);
+
     let res = await fetch(inbox, {
       ...acceptJson,
       method: "POST",
@@ -164,13 +190,7 @@ try {
         id: `${origin}/posts/${noteId}/activity`,
         type: "Create",
         actor: from.id,
-        object: {
-          ...object,
-          id: `${origin}/posts/${noteId}`,
-          type: "Note",
-          attributedTo: from.id,
-          to: [king, to.id],
-        },
+        object,
       }),
     });
     if (res.status !== 202) {
@@ -184,7 +204,7 @@ try {
     // Verify the object exists by refetching.
     res = await fetch(activity.object.id, acceptJson);
     const reply = await res.json();
-    console.log("<<", reply.content);
+    logObject(reply);
     return reply;
   }
 
