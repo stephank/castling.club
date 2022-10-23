@@ -108,6 +108,15 @@ castling.club's own debug logging can be enabled using, for example:
 DEBUG='chess:*' yarn start
 ```
 
+## Testing
+
+With the app running locally in development using default settings, you can run
+an automated test that plays a short game:
+
+```
+./functional-test/main.mjs
+```
+
 ## App structure
 
 The `server.js` entry point loads configuration, then starts the two main tasks
