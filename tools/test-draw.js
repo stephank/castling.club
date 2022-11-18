@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-import "../dist/test-draw";
+import "../dist/test-draw.js";
