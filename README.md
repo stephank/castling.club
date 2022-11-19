@@ -6,7 +6,7 @@ hardcoded 'King' service actor that acts as a chess arbiter.
 This code is MIT-licensed, see `LICENSE.md`.
 
 Not a requirement, but if you use this code for anything, I'd love to hear about
-it! Send me a toot: [@kosinus@mastodon.social]
+it! Send me a toot: [@kosinus@hachyderm.io]
 
 ## How to run
 
@@ -186,7 +186,7 @@ actual template files are [EJS] files, found in `assets/tmpl/`.
 
 [castling.club]: https://castling.club/
 [activitypub]: https://activitypub.rocks/
-[@kosinus@mastodon.social]: https://mastodon.social/@kosinus
+[@kosinus@hachyderm.io]: https://hachyderm.io/@kosinus
 [node.js]: https://nodejs.org/
 [yarn]: https://yarnpkg.com/
 [postgresql]: https://www.postgresql.org/
