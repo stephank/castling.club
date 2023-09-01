@@ -18,11 +18,11 @@ export interface MigrationRow {
 export interface MigrationOptions {
   before?(
     direction: MigrationDirection,
-    row: MigrationRow
+    row: MigrationRow,
   ): Promise<void> | void;
   after?(
     direction: MigrationDirection,
-    row: MigrationRow
+    row: MigrationRow,
   ): Promise<void> | void;
 }
 
@@ -71,7 +71,7 @@ class Runner {
   async run(
     direction: MigrationDirection,
     rows: MigrationRow[],
-    options: MigrationOptions = {}
+    options: MigrationOptions = {},
   ): Promise<void> {
     const pg = this.pg!;
     for (const row of rows) {
@@ -112,10 +112,10 @@ class Runner {
     const pg = this.pg!;
     const rows = await this.list();
     const stamp = Math.max(
-      ...rows.map((row) => (row.stamp ? row.stamp.getTime() : -1))
+      ...rows.map((row) => (row.stamp ? row.stamp.getTime() : -1)),
     );
     const todo = rows.filter(
-      (row) => row.stamp && row.stamp.getTime() === stamp
+      (row) => row.stamp && row.stamp.getTime() === stamp,
     );
     await this.run("down", todo, {
       ...options,

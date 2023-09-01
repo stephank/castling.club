@@ -45,7 +45,7 @@ export const sample = <T>(arr: T[]): T =>
 // Sort an array by a predicate, which should return a numeric value.
 export const sortBy = <T, S extends number>(
   arr: T[],
-  pred: (value: T) => S
+  pred: (value: T) => S,
 ): T[] => {
   const values = arr.map(pred);
   return arr
@@ -58,7 +58,7 @@ export const sortBy = <T, S extends number>(
 // nothing, which also never fails. Errors will be logged.
 export const detach =
   <F extends AnyAsyncFunction>(
-    fn: F
+    fn: F,
   ): ((...args: ArgumentsOf<F>) => Promise<void>) =>
   async (...args) =>
     fn(...args).catch((err) => {
@@ -76,7 +76,7 @@ export const originOf = (url: string): string | undefined => {
 export const checkPublicUrl = (
   url: string,
   descr: string,
-  devMode = false
+  devMode = false,
 ): boolean => {
   const invalidMsg =
     devMode && `DEV MODE: Would reject ${descr} URL in production: ${url}`;

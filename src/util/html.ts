@@ -34,7 +34,7 @@ const extractTextFromNode = (node: Node): string =>
     ? (node as TextNode).value
     : ((node as ParentNode).childNodes || []).reduce(
         (memo: string, node) => memo + extractTextFromNode(node),
-        ""
+        "",
       ) + (node.nodeName === "p" ? "\n" : "");
 
 // Reduce HTML to its text content.
@@ -42,14 +42,14 @@ export const extractText = (html: string): string =>
   extractTextFromNode(parseFragment(html)).replace(
     // eslint-disable-next-line no-control-regex
     /[\x00-\x09\x0b-\x1f\x7f]/g,
-    ""
+    "",
   );
 
 // Create an element node.
 export const createElement = (
   name: string,
   attrs: Attrs = {},
-  childNodes: VNode[] = []
+  childNodes: VNode[] = [],
 ) => ({
   name,
   attrs,
@@ -72,7 +72,7 @@ const toFragment = (nodes: VNode | VNode[]): DocumentFragment => {
 
 const toFragmentNode = (
   node: VNode,
-  parentNode: ParentNode
+  parentNode: ParentNode,
 ): ChildNode | undefined => {
   if (node === undefined) {
     return undefined;

@@ -338,7 +338,7 @@ export default (initialFen: string = DEFAULT_POSITION): Game => {
     from: number,
     to: number,
     flags: Flags,
-    promotion?: Piece
+    promotion?: Piece,
   ): Move => {
     const fromSquare = assertSquare(board[from]);
     const toSquare = board[to];
@@ -502,7 +502,7 @@ export default (initialFen: string = DEFAULT_POSITION): Game => {
   const legalMoves = memoize((): Set<Move> => {
     const us = turn;
     return new Set(
-      [...allMoves()].filter((move) => tryMove(move, () => !kingAttacked(us)))
+      [...allMoves()].filter((move) => tryMove(move, () => !kingAttacked(us))),
     );
   });
 
@@ -902,7 +902,7 @@ export default (initialFen: string = DEFAULT_POSITION): Game => {
           promotion?: string;
         };
     const matches = cleanMove.match(
-      /([pnbrqkPNBRQK])?([a-h][1-8])x?-?([a-h][1-8])([qrbnQRBN])?/
+      /([pnbrqkPNBRQK])?([a-h][1-8])x?-?([a-h][1-8])([qrbnQRBN])?/,
     );
     if (matches) {
       sloppy = {
