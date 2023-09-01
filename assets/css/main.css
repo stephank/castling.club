@@ -1,3 +1,7 @@
+:root {
+  color-scheme: light dark;
+}
+
 .container {
   max-width: 40rem;
   margin: 0 auto;
@@ -24,11 +28,10 @@
 a {
   margin: 0 -2px;
   padding: 0 2px;
-  background: rgba(64, 64, 196, 0.1);
+  background: color-mix(in srgb, LinkText 5%, transparent);
   text-decoration: none;
 }
 a:hover {
-  background: rgba(64, 64, 196, 0.05);
   text-decoration: underline;
 }
 
