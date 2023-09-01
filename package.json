@@ -16,7 +16,7 @@
     "fmt": "prettier --write . !.yarn",
     "prepack": "yarn build"
   },
-  "packageManager": "yarn@3.4.1",
+  "packageManager": "yarn@3.6.3",
   "type": "module",
   "files": [
     "./dist/**",
@@ -29,14 +29,14 @@
     "./tools/server.js"
   ],
   "dependencies": {
-    "@koa/router": "^10.0.0",
+    "@koa/router": "^12.0.0",
     "@rdfjs/data-model": "^1.2.0",
     "canvas": "^2.7.0",
     "co-body": "^6.1.0",
     "debug": "^4.3.1",
     "dotenv": "^16.0.3",
     "ejs": "^3.1.6",
-    "got": "^12.5.2",
+    "got": "^13.0.0",
     "http-errors": "^2.0.0",
     "jsonld": "^8.1.0",
     "koa": "^2.13.1",
@@ -50,7 +50,7 @@
     "@types/co-body": "^6.1.0",
     "@types/debug": "^4.1.5",
     "@types/ejs": "^3.0.6",
-    "@types/http-errors": "^1.8.0",
+    "@types/http-errors": "^2.0.1",
     "@types/keyv": "^3.1.1",
     "@types/koa": "^2.13.1",
     "@types/koa__router": "^12.0.0",
@@ -58,10 +58,10 @@
     "@types/node": "^18.11.0",
     "@types/pg": "^8.6.5",
     "@types/rdf-js": "^4.0.1",
-    "@types/uuid": "^8.3.0",
+    "@types/uuid": "^9.0.3",
     "chai": "^4.3.4",
     "mocha": "^10.1.0",
-    "prettier": "2.8.3",
-    "typescript": "4.9.5"
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
   }
 }

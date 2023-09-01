@@ -66,7 +66,7 @@ export default async ({
     // Lock all rows with the same addressee and no inbox yet.
     const { rows: deliveryRows } = await lockSharedAddresseeDeliveries(
       pg,
-      addressee
+      addressee,
     );
 
     // Should've matched the original delivery as well.
@@ -120,7 +120,7 @@ export default async ({
         debug(`Resolved ${addressee}, personal inbox: ${inbox}`);
       } else {
         console.warn(
-          `Tried to address actor with no or invalid inbox: ${addressee}`
+          `Tried to address actor with no or invalid inbox: ${addressee}`,
         );
         return deleteDelivery(pg, delivery);
       }
@@ -135,7 +135,7 @@ export default async ({
       outboxIds,
       addressee,
       inbox,
-      attemptAt
+      attemptAt,
     );
     assert.strictEqual(rowCount, outboxIds.length);
   };
@@ -143,7 +143,7 @@ export default async ({
   // Deliver an activity from the outbox.
   const deliverActivity = async (
     pg: Pg,
-    delivery: DeliveryRow
+    delivery: DeliveryRow,
   ): Promise<void> => {
     const { outboxId, addressee, inbox } = delivery;
 
@@ -151,7 +151,7 @@ export default async ({
     const { rows: deliveryRows } = await lockSharedInboxDeliveries(
       pg,
       outboxId,
-      inbox
+      inbox,
     );
 
     // Should've matched the original delivery as well.
@@ -220,7 +220,7 @@ export default async ({
   const scheduleRetry = async (
     pg: Pg,
     delivery: DeliveryRow,
-    addressees?: string[]
+    addressees?: string[],
   ): Promise<DeliveryRetry | undefined> => {
     const attemptNum = delivery.attemptNum + 1;
     if (attemptNum >= MAX_ATTEMPTS) {
@@ -238,7 +238,7 @@ export default async ({
       delivery.outboxId,
       addressees,
       attemptAt,
-      attemptNum
+      attemptNum,
     );
     assert.strictEqual(rowCount, addressees.length);
 
@@ -250,7 +250,7 @@ export default async ({
   const deleteDelivery = async (
     pg: Pg,
     delivery: DeliveryRow,
-    addressees?: string[]
+    addressees?: string[],
   ): Promise<void> => {
     if (!addressees) {
       addressees = [delivery.addressee];
@@ -259,7 +259,7 @@ export default async ({
     const { rowCount } = await deleteDeliveriesByAddressees(
       pg,
       delivery.outboxId,
-      addressees
+      addressees,
     );
     assert.strictEqual(rowCount, addressees.length);
   };
@@ -281,7 +281,7 @@ export default async ({
       if (delivery.attemptAt > now) {
         const delta = Math.min(
           DEFAULT_INTERVAL,
-          delivery.attemptAt.valueOf() - now.valueOf()
+          delivery.attemptAt.valueOf() - now.valueOf(),
         );
         debug(`Have pending, next run in ${(delta / 1000).toFixed(1)}s`);
         timerHandle = setTimeout(onTimer, delta);

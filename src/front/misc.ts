@@ -24,7 +24,7 @@ export default async ({
 }): Promise<MiscCtrl> => {
   const stylesheet = await readAsset("css/main.css");
   const chessNs = JSON.parse(
-    (await readAsset("ns/chess_v0.json")).toString("utf8")
+    (await readAsset("ns/chess_v0.json")).toString("utf8"),
   );
 
   // Serve the index page.

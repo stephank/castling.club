@@ -36,13 +36,13 @@ const contextDoc = {
         "content",
         "preferredUsername",
         "name",
-      ].map((prop) => [prop, `as:${prop}`])
+      ].map((prop) => [prop, `as:${prop}`]),
     ),
     // ActivityStreams relation properties.
     ...Object.fromEntries(
       ["actor", "object", "attributedTo", "inReplyTo", "tag", "to", "href"].map(
-        (prop) => [prop, { "@id": `as:${prop}`, "@type": "@id" }]
-      )
+        (prop) => [prop, { "@id": `as:${prop}`, "@type": "@id" }],
+      ),
     ),
   },
 };
@@ -196,7 +196,7 @@ try {
     if (res.status !== 202) {
       throw Error(
         `Unexpected status on King's inbox: ${res.status}\n` +
-          (await res.text())
+          (await res.text()),
       );
     }
     // Pull from both inboxes, but we care about just one.

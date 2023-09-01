@@ -151,7 +151,7 @@ export default async ({
         row.blackName,
         game.fen(),
         row.badge,
-        now
+        now,
       );
       assert.strictEqual(rowCount, 1);
 
@@ -176,7 +176,7 @@ export default async ({
       // Look up the game.
       const { rows: gameRows } = await getGameByObjectForUpdate(
         pg,
-        object.inReplyTo!
+        object.inReplyTo!,
       );
       if (gameRows.length !== 1) {
         debug("Reply unrelated to a game");
@@ -233,7 +233,7 @@ export default async ({
         row.id,
         game.fen(),
         game.isGameOver(),
-        now
+        now,
       );
       assert.strictEqual(rowCount, 1);
 
@@ -250,7 +250,7 @@ export default async ({
     object: ObjectExt,
     game: Game,
     row: GameMeta,
-    opts: { move?: PrettyMove; createdAt?: Date } = {}
+    opts: { move?: PrettyMove; createdAt?: Date } = {},
   ): Promise<void> => {
     const move = opts.move;
 
@@ -369,7 +369,7 @@ export default async ({
     object: ObjectExt,
     game: Game,
     row: GameMeta,
-    input: string
+    input: string,
   ): Promise<void> => {
     // Get the 5 best matching moves, and turn them into text.
     const moves = sortBy([...game.moves()], (move) => leven(input, move))
@@ -401,7 +401,7 @@ export default async ({
           `Maybe ${movesText}?`,
           `Looking for ${movesText}?`,
         ]),
-      ])
+      ]),
     );
 
     // Create the reply note.
@@ -426,7 +426,7 @@ export default async ({
   const insertGameObjectChecked = async (
     pg: Pg,
     gameId: string,
-    objectId: string
+    objectId: string,
   ): Promise<void> => {
     const { rowCount } = await insertGameObject(pg, gameId, objectId);
     assert.strictEqual(rowCount, 1);
