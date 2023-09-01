@@ -69,7 +69,7 @@ export default async ({
     } catch (err: any) {
       throw createError(
         400,
-        `Activity document could not be loaded: ${err.message}`
+        `Activity document could not be loaded: ${err.message}`,
       );
     }
 
@@ -87,7 +87,7 @@ export default async ({
     } catch (err: any) {
       if (isDev) {
         console.warn(
-          `DEV MODE: Would reject signature in production: ${err.message}`
+          `DEV MODE: Would reject signature in production: ${err.message}`,
         );
       } else {
         throw err;
@@ -105,7 +105,7 @@ export default async ({
     } catch (err: any) {
       throw createError(
         400,
-        `Actor document could not be loaded: ${err.message}`
+        `Actor document could not be loaded: ${err.message}`,
       );
     }
 
@@ -134,7 +134,7 @@ export default async ({
         if (object.attributedTo !== activity.actor) {
           throw createError(
             400,
-            "Activity creates note not attributed to the actor"
+            "Activity creates note not attributed to the actor",
           );
         }
 

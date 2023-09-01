@@ -85,7 +85,7 @@ export interface ChallengeBoardRow {
 export const tryInsertInboxObject = async (
   pg: Pg,
   activityId: string,
-  createdAt: Date
+  createdAt: Date,
 ): EmptyPromise =>
   q(pg)`
     -- try insert inbox object
@@ -99,7 +99,7 @@ export const insertOutboxObject = async (
   id: string,
   object: any,
   activity: any,
-  createdAt: Date
+  createdAt: Date,
 ): EmptyPromise =>
   q(pg)`
     -- insert outbox object
@@ -111,7 +111,7 @@ export const insertDelivery = async (
   pg: Pg,
   id: string,
   addressee: string,
-  createdAt: Date
+  createdAt: Date,
 ): EmptyPromise =>
   q(pg)`
     -- insert delivery
@@ -121,7 +121,7 @@ export const insertDelivery = async (
 
 export const getOutboxObjectById = async (
   pg: Pg,
-  id: string
+  id: string,
 ): ModelPromise<OutboxRow, "object" | "hasFen" | "createdAt"> =>
   q(pg)`
     -- get outbox object by id
@@ -133,7 +133,7 @@ export const getOutboxObjectById = async (
 export const getPrevOutboxMoveId = async (
   pg: Pg,
   gameId: string,
-  refCreatedAt: Date
+  refCreatedAt: Date,
 ): ModelPromise<OutboxRow, "id"> =>
   q(pg)`
     -- get prev outbox move id
@@ -154,7 +154,7 @@ export const getPrevOutboxMoveId = async (
 export const getNextOutboxMoveId = async (
   pg: Pg,
   gameId: string,
-  refCreatedAt: Date
+  refCreatedAt: Date,
 ): ModelPromise<OutboxRow, "id"> =>
   q(pg)`
     -- get next outbox move id
@@ -174,7 +174,7 @@ export const getNextOutboxMoveId = async (
 
 export const getGameOverById = async (
   pg: Pg,
-  id: string
+  id: string,
 ): ModelPromise<GameRow, "gameOver"> =>
   q(pg)`
     -- get game over by id
@@ -185,7 +185,7 @@ export const getGameOverById = async (
 
 export const getOutboxActivityById = async (
   pg: Pg,
-  id: string
+  id: string,
 ): ModelPromise<OutboxRow, "activity" | "hasFen"> =>
   q(pg)`
     -- get outbox activity by id
@@ -196,7 +196,7 @@ export const getOutboxActivityById = async (
 
 export const lockSharedAddresseeDeliveries = async (
   pg: Pg,
-  addressee: string
+  addressee: string,
 ): ModelPromise<DeliveryRow, "outboxId"> =>
   q(pg)`
     -- lock shared addressee deliveries
@@ -212,7 +212,7 @@ export const updateDeliveryInboxByAddressee = async (
   outboxIds: string[],
   addressee: string,
   inbox: string,
-  attemptAt: Date
+  attemptAt: Date,
 ): EmptyPromise =>
   q(pg)`
     -- update delivery inbox by addressee
@@ -228,7 +228,7 @@ export const updateDeliveryInboxByAddressee = async (
 export const lockSharedInboxDeliveries = async (
   pg: Pg,
   outboxId: string,
-  inbox: string
+  inbox: string,
 ): ModelPromise<DeliveryRow, "addressee"> =>
   q(pg)`
     -- lock shared inbox deliveries
@@ -241,7 +241,7 @@ export const lockSharedInboxDeliveries = async (
 
 export const getOutboxById = async (
   pg: Pg,
-  id: string
+  id: string,
 ): ModelPromise<OutboxRow, "object" | "activity"> =>
   q(pg)`
     -- get outbox by id
@@ -255,7 +255,7 @@ export const updateDeliveryAttemptByAddressees = async (
   outboxId: string,
   addressees: string[],
   attemptAt: Date,
-  attemptNum: number
+  attemptNum: number,
 ): EmptyPromise =>
   q(pg)`
     -- update delivery attempt by addressees
@@ -270,7 +270,7 @@ export const updateDeliveryAttemptByAddressees = async (
 export const deleteDeliveriesByAddressees = async (
   pg: Pg,
   outboxId: string,
-  addressees: string[]
+  addressees: string[],
 ): EmptyPromise =>
   q(pg)`
     -- delete deliveries by addressees
@@ -292,7 +292,7 @@ export const getNextDelivery = async (pg: Pg): ModelPromise<DeliveryRow> =>
 
 export const getGameByObjectForUpdate = async (
   pg: Pg,
-  objectId: string
+  objectId: string,
 ): ModelPromise<
   GameRow,
   "id" | "whiteId" | "whiteName" | "blackId" | "blackName" | "fen" | "badge"
@@ -314,7 +314,7 @@ export const updateGame = async (
   id: string,
   fen: string,
   gameOver: boolean,
-  updatedAt: Date
+  updatedAt: Date,
 ): EmptyPromise =>
   q(pg)`
     -- update game
@@ -337,7 +337,7 @@ export const insertGame = async (
   blackName: string,
   fen: string,
   badge: string,
-  createdAt: Date
+  createdAt: Date,
 ): EmptyPromise =>
   q(pg)`
     -- insert game
@@ -367,7 +367,7 @@ export const insertGame = async (
 export const insertGameObject = async (
   pg: Pg,
   gameId: string,
-  objectId: string
+  objectId: string,
 ): EmptyPromise =>
   q(pg)`
     -- insert game object
@@ -377,7 +377,7 @@ export const insertGameObject = async (
 
 export const getGameById = async (
   pg: Pg,
-  id: string
+  id: string,
 ): ModelPromise<
   GameRow,
   | "id"
@@ -408,7 +408,7 @@ export const getGameById = async (
 
 export const getOutboxMovesByGame = async (
   pg: Pg,
-  gameId: string
+  gameId: string,
 ): ModelPromise<OutboxRow, "object"> =>
   q(pg)`
     -- get outbox moves by game
@@ -425,7 +425,7 @@ export const getOutboxMovesByGame = async (
   `;
 
 export const getRecentGames = async (
-  pg: Pg
+  pg: Pg,
 ): ModelPromise<
   GameRow,
   "id" | "whiteName" | "blackName" | "numMoves" | "updatedAt"
@@ -440,7 +440,7 @@ export const getRecentGames = async (
   `;
 
 export const getChallengeBoard = async (
-  pg: Pg
+  pg: Pg,
 ): ModelPromise<ChallengeBoardRow, "actorId" | "actorName"> =>
   q(pg)`
     -- get challenge board
@@ -454,7 +454,7 @@ export const insertOrBumpChallengeBoard = async (
   pg: Pg,
   actorId: string,
   actorName: string,
-  now: Date
+  now: Date,
 ): ModelPromise<ChallengeBoardRow, "createdAt"> =>
   q(pg)`
     -- insert or bump challenge board
@@ -468,7 +468,7 @@ export const insertOrBumpChallengeBoard = async (
 
 export const removeFromChallengeBoard = async (
   pg: Pg,
-  actorId: string
+  actorId: string,
 ): EmptyPromise =>
   q(pg)`
     -- remove from challenge board

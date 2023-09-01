@@ -91,7 +91,7 @@ export default async ({
     ctx: Context,
     signatureHeader: string,
     headerMap: HeaderMap,
-    store: TripleStore
+    store: TripleStore,
   ): Promise<PublicKey | undefined> => {
     // Parse the `Signature` header parameters.
     // @todo: Properly parse quoted-strings.
@@ -144,7 +144,7 @@ export default async ({
     } catch (err: any) {
       throw createError(
         400,
-        `Signature public key document could not be loaded: ${err.mesage}`
+        `Signature public key document could not be loaded: ${err.mesage}`,
       );
     }
 
@@ -203,7 +203,7 @@ export default async ({
       const signedData = [
         `(request-target): ${method.toLowerCase()} ${(url as URL).pathname}`,
         ...signedHeaders.map(
-          (name) => `${name.toLowerCase()}: ${options.headers[name]}`
+          (name) => `${name.toLowerCase()}: ${options.headers[name]}`,
         ),
       ].join("\n");
 

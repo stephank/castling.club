@@ -91,7 +91,7 @@ export default async ({
       id,
       object,
       activity,
-      createdAt
+      createdAt,
     );
     assert.strictEqual(rowCount, 1);
 
@@ -100,7 +100,7 @@ export default async ({
       [...addressees].map(async (addressee) => {
         const { rowCount } = await insertDelivery(pg, id, addressee, createdAt);
         assert.strictEqual(rowCount, 1);
-      })
+      }),
     );
 
     // Notify delivery workers.

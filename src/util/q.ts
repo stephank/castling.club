@@ -78,7 +78,7 @@ const fromUnderscored = (input: string): string => {
 // Run the code block with a single connection.
 q.withClient = async <T>(
   pg: Pg,
-  fn: (client: ClientBase) => Promise<T>
+  fn: (client: ClientBase) => Promise<T>,
 ): Promise<T> => {
   // Can't rely on an `instanceof` check here, unfortunately.
   if ("idleCount" in pg) {
@@ -98,7 +98,7 @@ q.withClient = async <T>(
 // Throw or return `false` to roll back the transaction.
 q.transact = <T>(
   pg: Pg,
-  fn: (client: ClientBase) => Promise<T>
+  fn: (client: ClientBase) => Promise<T>,
 ): Promise<T> => {
   return q.withClient(pg, async (pg) => {
     let res;

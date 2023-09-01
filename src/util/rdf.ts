@@ -100,7 +100,7 @@ export class TripleStore {
   // Example: `store.with(actorId, get => ({ type: get(RDF('type'), node) }))`
   with<T>(subjectName: string, block: (get: BoundGetter) => T): T {
     return block((predicateName, parser) =>
-      this.get(subjectName, predicateName, parser)
+      this.get(subjectName, predicateName, parser),
     );
   }
 }
@@ -109,7 +109,7 @@ export class TripleStore {
 export const nodes: Parser<string[]> = (terms) =>
   terms
     .filter(
-      (term) => term.termType === "NamedNode" || term.termType === "BlankNode"
+      (term) => term.termType === "NamedNode" || term.termType === "BlankNode",
     )
     .map((term) => term.value);
 
@@ -128,10 +128,10 @@ export const text =
     );
 
     const strings = literals.filter(
-      (term) => term.datatype.value === XML("string")
+      (term) => term.datatype.value === XML("string"),
     );
     const langStrings = literals.filter(
-      (term) => term.datatype.value === RDF("langString")
+      (term) => term.datatype.value === RDF("langString"),
     );
 
     for (const language of languages) {

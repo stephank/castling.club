@@ -106,7 +106,7 @@ export default async ({
   // Decode slug format into an array of pieces.
   // Trusts input, assuming the HMAC signature was already verified.
   const decodeSlug = (
-    slug: string
+    slug: string,
   ): {
     pieces: string[];
     side: string;
@@ -193,7 +193,7 @@ export default async ({
             pixelX + SQUARE_PADDING_SIZE,
             pixelY + SQUARE_PADDING_SIZE,
             SQUARE_IMAGE_SIZE,
-            SQUARE_IMAGE_SIZE
+            SQUARE_IMAGE_SIZE,
           );
         }
       }
@@ -279,15 +279,15 @@ export default async ({
       ctx.beginPath();
       ctx.lineTo(
         endX - sin(angleControl + CAP_WIDTH_ANGLE) * longCapSize,
-        endY - cos(angleControl + CAP_WIDTH_ANGLE) * longCapSize
+        endY - cos(angleControl + CAP_WIDTH_ANGLE) * longCapSize,
       );
       ctx.lineTo(
         endX - sin(angleControl) * shortCapSize,
-        endY - cos(angleControl) * shortCapSize
+        endY - cos(angleControl) * shortCapSize,
       );
       ctx.lineTo(
         endX - sin(angleControl - CAP_WIDTH_ANGLE) * longCapSize,
-        endY - cos(angleControl - CAP_WIDTH_ANGLE) * longCapSize
+        endY - cos(angleControl - CAP_WIDTH_ANGLE) * longCapSize,
       );
       ctx.lineTo(endX, endY);
       ctx.fill();
@@ -332,7 +332,7 @@ export default async ({
   const imageUrlFor = (
     pieces: string,
     side: string,
-    move?: PrettyMove
+    move?: PrettyMove,
   ): string => {
     let slug = `${pieces}${side}`;
     if (move) {

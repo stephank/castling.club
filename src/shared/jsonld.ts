@@ -43,7 +43,7 @@ const fromPlainTerm = (plainTerm: PlainTerm): Term => {
     case "Literal":
       return rdf.literal(
         plainTerm.value,
-        plainTerm.language || rdf.namedNode(plainTerm.datatype.value)
+        plainTerm.language || rdf.namedNode(plainTerm.datatype.value),
       );
     case "DefaultGraph":
       return rdf.defaultGraph();
@@ -56,7 +56,7 @@ const fromPlainQuad = (plainQuad: PlainQuad): Quad =>
     <Quad_Subject>fromPlainTerm(plainQuad.subject),
     <Quad_Predicate>fromPlainTerm(plainQuad.predicate),
     <Quad_Object>fromPlainTerm(plainQuad.object),
-    <Quad_Graph>fromPlainTerm(plainQuad.graph)
+    <Quad_Graph>fromPlainTerm(plainQuad.graph),
   );
 
 // Holds a graph of data extracted from JSON-LD documents.
