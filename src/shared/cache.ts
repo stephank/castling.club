@@ -1,9 +1,10 @@
 import createDebug from "debug";
-import { Store } from "keyv";
 
-import { Pg } from "../util/q.js";
+import type { Pg } from "../util/q.js";
+import type { FetchacheCacheEntry } from "fetchache";
+import { identity } from "../util/misc.js";
 
-export interface CacheStore<T> extends Store<T> {
+export interface CacheStore<T> {
   get(id: string): Promise<T | undefined>;
   set(id: string, data: T): Promise<void>;
   delete(id: string): Promise<boolean>;
@@ -12,7 +13,7 @@ export interface CacheStore<T> extends Store<T> {
 
 export interface CacheService {
   draw: CacheStore<Buffer>;
-  http: CacheStore<string>;
+  http: CacheStore<FetchacheCacheEntry>;
 }
 
 const debug = createDebug("chess:cache");
@@ -22,7 +23,16 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
   //
   // We don't use `@keyv/postgres`, because some of our caching uses the store
   // directly to store a different value type, and we get to reuse our pool.
-  const createStore = <T>(name: string): CacheStore<T> => ({
+  const createStore = <T>(
+    name: string,
+    {
+      serialize = identity,
+      deserialize = identity,
+    }: {
+      serialize?: (value: T) => any;
+      deserialize?: (data: any) => T;
+    } = {},
+  ): CacheStore<T> => ({
     async get(id) {
       const { rows } = await pg.query({
         name: `get ${name}`,
@@ -34,14 +44,14 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
       });
       if (rows.length !== 0) {
         debug(`HIT ${name}: ${id}`);
-        return rows[0].data;
+        return deserialize(rows[0].data);
       } else {
         debug(`MISS ${name}: ${id}`);
         return undefined;
       }
     },
 
-    async set(id, data) {
+    async set(id, value) {
       debug(`SET ${name}: ${id}`);
       await pg.query({
         name: `set ${name}`,
@@ -51,7 +61,7 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
           on conflict (id) do update
             set data = $2
         `,
-        values: [id, data],
+        values: [id, serialize(value)],
       });
     },
 
@@ -82,6 +92,9 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
   // Create default stores.
   return {
     draw: createStore<Buffer>("draw_cache"),
-    http: createStore<string>("http_cache"),
+    http: createStore<FetchacheCacheEntry>("http_cache", {
+      serialize: JSON.stringify,
+      deserialize: JSON.parse,
+    }),
   };
 };

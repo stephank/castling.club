@@ -1,6 +1,6 @@
 import createDebug from "debug";
-import got from "got";
 import rdf from "@rdfjs/data-model";
+import { fetchFactory } from "fetchache";
 
 import type {
   Term,
@@ -103,6 +103,12 @@ export default async ({
   origin: string;
 }): Promise<JsonLdService> => {
   const jsonld = jsonldFactory();
+  const fetchWithCache = fetchFactory({
+    cache: cache.http,
+    fetch,
+    Request,
+    Response,
+  });
 
   // Setup JSON-LD to use 'got' with caching.
   jsonld.documentLoader = async (url: string) => {
@@ -111,14 +117,13 @@ export default async ({
     }
 
     debug(`REQ: ${url}`);
-    const document: any = await got(url, {
-      resolveBodyOnly: true,
-      cache: cache.http,
+    const res = await fetchWithCache(url, {
       headers: {
         "user-agent": `${origin}/`,
         accept: JSON_ACCEPTS,
       },
-    }).json();
+    });
+    const document = await res.json();
     return { document };
   };
 

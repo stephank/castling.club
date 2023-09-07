@@ -137,7 +137,11 @@ const server = http.createServer((req, res) => {
       return;
   }
   if (body) {
-    res.writeHead(200, { "Content-Type": "application/json" });
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Cache-Control":
+        req.method === "GET" ? "public, max-age=86400" : "no-store",
+    });
     res.end(JSON.stringify(body));
   } else {
     res.writeHead(400);

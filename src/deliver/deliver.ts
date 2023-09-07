@@ -1,6 +1,5 @@
 import assert from "assert";
 import createDebug from "debug";
-import got from "got";
 import postgres from "pg";
 
 import { AS_MIME, JSON_ACCEPTS } from "../util/consts.js";
@@ -178,17 +177,19 @@ export default async ({
     // Make the signed request to the inbox.
     let res;
     try {
-      res = await got.post(inbox, {
-        headers: {
-          "user-agent": `${origin}/`,
-          "content-type": AS_MIME,
-          accept: JSON_ACCEPTS,
-        },
-        hooks: {
-          beforeRequest: [signing.signHook(publicKeyUrl, privateKeyPem)],
-        },
-        json,
-      });
+      const url = new URL(inbox);
+      res = await fetch(
+        url,
+        signing.sign(publicKeyUrl, privateKeyPem, url, {
+          method: "POST",
+          headers: {
+            "user-agent": `${origin}/`,
+            "content-type": AS_MIME,
+            accept: JSON_ACCEPTS,
+          },
+          body: JSON.stringify(json),
+        }),
+      );
     } catch (err: any) {
       console.warn(`Failed delivery to inbox: ${inbox}`);
       console.warn(`Error: ${err.message}`);
@@ -211,7 +212,7 @@ export default async ({
     }
 
     // Delete the deliveries that finished successfully.
-    debug(`Delivered (${res.statusCode}): [${outboxId}] ${inbox}`);
+    debug(`Delivered (${res.status}): [${outboxId}] ${inbox}`);
     return deleteDelivery(pg, delivery, addressees);
   };
 

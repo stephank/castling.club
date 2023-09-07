@@ -1,6 +1,5 @@
 import createError from "http-errors";
 import crypto from "crypto";
-import { BeforeRequestHook } from "got";
 import { Context } from "koa";
 
 import { TripleStore } from "./jsonld.js";
@@ -9,7 +8,12 @@ import { ensureArray } from "../util/misc.js";
 
 export interface SigningService {
   verify(ctx: Context, body: string, store: TripleStore): Promise<PublicKey>;
-  signHook(keyId: string, privateKeyPem: string): BeforeRequestHook;
+  sign(
+    keyId: string,
+    privateKeyPem: string,
+    url: URL,
+    options: RequestInit,
+  ): RequestInit;
 }
 
 type HeaderMap = Map<string, string[]>;
@@ -176,55 +180,67 @@ export default async ({
     return publicKey;
   };
 
-  // Hook for `got` `beforeRequest` to sign a request using the given key.
-  const signHook: SigningService["signHook"] =
-    (keyId, privateKeyPem) => (options) => {
-      if (!options.body && options.json) {
-        options.body = JSON.stringify(options.json);
-      }
+  // Sign a request.
+  const sign: SigningService["sign"] = (keyId, privateKeyPem, url, options) => {
+    let body = options.body;
+    if (typeof body !== "string" && !Buffer.isBuffer(body)) {
+      throw Error("Cannot sign streaming body");
+    }
 
-      let body = options.body;
-      if (typeof body !== "string" && !Buffer.isBuffer(body)) {
-        throw Error("Cannot sign streaming body");
-      }
+    // Hash the body.
+    const sha256 = crypto.createHash("sha256").update(body).digest("base64");
 
-      // Hash the body.
-      const sha256 = crypto.createHash("sha256").update(body).digest("base64");
+    if (!(options.headers instanceof Headers)) {
+      options.headers = new Headers(options.headers);
+    }
+    const headers = options.headers;
 
-      // Create the `Digest` header.
-      options.headers.digest = `SHA-256=${sha256}`;
+    // Ensure a `Host` header is present, so it is included in the signature.
+    headers.set("host", url.host);
 
-      // Create our own `Date` header, because we include it in the signature.
-      options.headers.date = new Date().toUTCString();
+    // Create the `Digest` header.
+    headers.set("digest", `SHA-256=${sha256}`);
 
-      // Build the signed data.
-      const { method, url } = options;
-      const signedHeaders = Object.keys(options.headers);
-      const signedData = [
-        `(request-target): ${method.toLowerCase()} ${(url as URL).pathname}`,
-        ...signedHeaders.map(
-          (name) => `${name.toLowerCase()}: ${options.headers[name]}`,
-        ),
-      ].join("\n");
+    // Create our own `Date` header, because we include it in the signature.
+    headers.set("date", new Date().toUTCString());
 
-      // Sign the headers.
-      // @todo: Support non-RSA keys.
-      const signature = crypto
-        .createSign("sha256")
-        .update(signedData)
-        .sign(privateKeyPem, "base64");
+    // Build the signed data.
+    const method = (options.method || "get").toLowerCase();
+    const signedHeaders = (() => {
+      const list = new Set<string>();
+      headers.forEach((_value, name) => {
+        list.add(name);
+      });
+      return [...list].sort();
+    })();
+    const signedData = [
+      `(request-target): ${method} ${url.pathname}\n`,
+      ...signedHeaders.map((name) => `${name}: ${headers.get(name)}`),
+    ].join("\n");
 
-      // Create the `Signature` header.
-      const signatureHeaders = [
-        "(request-target)",
-        ...signedHeaders.map((name) => name.toLowerCase()),
-      ].join(" ");
-      options.headers.signature = [
+    // Sign the headers.
+    // @todo: Support non-RSA keys.
+    const signature = crypto
+      .createSign("sha256")
+      .update(signedData)
+      .sign(privateKeyPem, "base64");
+
+    // Create the `Signature` header.
+    const signatureHeaders = [
+      "(request-target)",
+      ...signedHeaders.map((name) => name.toLowerCase()),
+    ].join(" ");
+    headers.set(
+      "signature",
+      [
         `keyId="${keyId}"`,
         `headers="${signatureHeaders}"`,
         `signature="${signature}"`,
-      ].join(",");
-    };
+      ].join(","),
+    );
 
-  return { verify, signHook };
+    return options;
+  };
+
+  return { verify, sign };
 };

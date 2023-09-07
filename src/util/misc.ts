@@ -25,6 +25,9 @@ const INVALID_TLDS = new Set([
 // https://url.spec.whatwg.org/#forbidden-host-code-point
 const INVALID_HOST_CHARS = new Set("\0\t\n\r #%/:?@[\\]");
 
+// Identity function.
+export const identity = <T>(x: T): T => x;
+
 // A very simple namespacing tool.
 export const ns =
   (prefix: string) =>
