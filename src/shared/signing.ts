@@ -214,7 +214,7 @@ export default async ({
       return [...list].sort();
     })();
     const signedData = [
-      `(request-target): ${method} ${url.pathname}\n`,
+      `(request-target): ${method} ${url.pathname}`,
       ...signedHeaders.map((name) => `${name}: ${headers.get(name)}`),
     ].join("\n");
 
