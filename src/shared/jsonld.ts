@@ -123,6 +123,10 @@ export default async ({
         accept: JSON_ACCEPTS,
       },
     });
+    if (res.status >= 400) {
+      throw Error("HTTP status code " + res.status);
+    }
+
     const document = await res.json();
     return { document };
   };

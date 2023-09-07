@@ -190,16 +190,14 @@ export default async ({
           body: JSON.stringify(json),
         }),
       );
+      if (res.status >= 500) {
+        throw Error("HTTP status code " + res.status);
+      }
     } catch (err: any) {
       console.warn(`Failed delivery to inbox: ${inbox}`);
       console.warn(`Error: ${err.message}`);
 
-      // Schedule a retry, if appropriate.
-      const statusCode = err.statusCode || 0;
-      const retry =
-        (!statusCode || statusCode >= 500) &&
-        (await scheduleRetry(pg, delivery, addressees));
-
+      const retry = await scheduleRetry(pg, delivery, addressees);
       if (retry) {
         const delaySec = ~~(retry.delay / 1000);
         console.warn(`Scheduled retry #${retry.attemptNum} in ${delaySec}s`);
