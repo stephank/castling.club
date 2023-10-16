@@ -16,7 +16,7 @@
     "fmt": "prettier --write . !.yarn",
     "prepack": "yarn build"
   },
-  "packageManager": "yarn@3.6.3",
+  "packageManager": "yarn@3.6.4",
   "type": "module",
   "files": [
     "./dist/**",
