@@ -1,10 +1,8 @@
 # Starts PostgreSQL and castling.club, then runs the test.
 
-pkgs: with pkgs;
-let
-  app = pkgs.castling-club.packages.default;
-in
-runCommand "test" {
+app: pkgs: with pkgs;
+runCommand "test"
+{
   nativeBuildInputs = [ app openssl postgresql ];
 } ''
   set -xeuo pipefail
