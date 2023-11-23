@@ -2,7 +2,7 @@
 
 pkgs: with pkgs;
 let
-  app = pkgs.castling-club.defaultPackage;
+  app = pkgs.castling-club.packages.default;
 in
 runCommand "test" {
   nativeBuildInputs = [ app openssl postgresql ];

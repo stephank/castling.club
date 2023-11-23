@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -11,8 +11,14 @@
       name = "castling-club";
       overlay = final: prev: let
 
+        inherit (final) stdenv;
+
         # Major Node.js version.
-        nodejs = final.nodejs-18_x;
+        nodejs = final.nodejs_20;
+
+        corepack = final.corepack.override {
+          inherit nodejs;
+        };
 
         # Packages required to build the `canvas` npm package.
         canvasDeps = with final; (
@@ -34,19 +40,22 @@
           };
           overrideCanvasAttrs = old: {
             buildInputs = old.buildInputs ++ canvasDeps;
+            env = optionalAttrs (stdenv.isDarwin && stdenv.isx86_64) {
+              NIX_CFLAGS_COMPILE = "-D__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__=101300";
+            };
           };
         };
 
       in {
 
         # For `nix build`
-        castling-club.defaultPackage = package;
+        castling-club.packages.default = package;
 
         # For `nix develop`
         castling-club.devShell = final.mkShell {
           buildInputs = (with final; [ postgresql ])
             ++ canvasDeps
-            ++ [ nodejs package.yarn-freestanding ];
+            ++ [ nodejs corepack ];
         };
 
         # For `nix flake check`
