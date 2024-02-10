@@ -1,7 +1,7 @@
 // A simple PostgreSQL migration runner.
 
 import dotenv from "dotenv";
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 import pg from "pg";
 
 export type MigrationDirection = "up" | "down";

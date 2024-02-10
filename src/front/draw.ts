@@ -1,6 +1,6 @@
 import Router from "@koa/router";
-import assert from "assert";
-import crypto from "crypto";
+import assert from "node:assert";
+import crypto from "node:crypto";
 import { Context } from "koa";
 import { Image, createCanvas, loadImage, registerFont } from "canvas";
 

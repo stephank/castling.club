@@ -1,4 +1,4 @@
-import { isIPv4 } from "net";
+import { isIPv4 } from "node:net";
 
 // Get the arguments array type of a functino.
 type ArgumentsOf<T> = T extends (...args: infer A) => any ? A : never;

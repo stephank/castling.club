@@ -1,4 +1,4 @@
-import assert from "assert";
+import assert from "node:assert";
 import createDebug from "debug";
 import postgres from "pg";
 

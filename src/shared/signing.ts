@@ -1,5 +1,5 @@
 import createError from "http-errors";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { Context } from "koa";
 
 import { TripleStore } from "./jsonld.js";

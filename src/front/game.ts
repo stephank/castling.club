@@ -1,5 +1,5 @@
 import Router from "@koa/router";
-import assert from "assert";
+import assert from "node:assert";
 import createDebug from "debug";
 import leven from "leven";
 import { Context } from "koa";

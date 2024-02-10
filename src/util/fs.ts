@@ -1,5 +1,5 @@
 import ejs from "ejs";
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 
 import { ASSETS_BASE } from "./consts.js";
 

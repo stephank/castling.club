@@ -2,7 +2,7 @@ import Router from "@koa/router";
 import coBody from "co-body";
 import createDebug from "debug";
 import createError from "http-errors";
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 
 import { AS } from "../util/consts.js";
 import { JsonLdService } from "../shared/jsonld.js";

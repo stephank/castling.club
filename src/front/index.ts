@@ -1,6 +1,6 @@
 import Koa from "koa";
 import Router from "@koa/router";
-import { Server } from "http";
+import { Server } from "node:http";
 
 import createApp, { AppConfig, BaseApp } from "../shared/createApp.js";
 import { DEFAULT_CACHE_SEC } from "../util/consts.js";

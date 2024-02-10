@@ -1,4 +1,4 @@
-import assert from "assert";
+import assert from "node:assert";
 
 import q from "../util/q.js";
 import { CONFIRMATIONS } from "../util/consts.js";

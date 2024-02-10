@@ -1,6 +1,6 @@
 // Calls the draw code and writes `test.png`.
 
-import fs from "fs";
+import fs from "node:fs";
 
 import draw from "./front/draw.js";
 
