@@ -9,7 +9,7 @@ import type {
   Quad_Predicate,
   Quad_Object,
   Quad_Graph,
-} from "rdf-js";
+} from "@rdfjs/types";
 
 import jsonldFactory, {
   Term as PlainTerm,

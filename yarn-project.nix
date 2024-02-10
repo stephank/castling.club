@@ -7,8 +7,8 @@
 let
 
   yarnBin = fetchurl {
-    url = "https://repo.yarnpkg.com/4.0.2/packages/yarnpkg-cli/bin/yarn.js";
-    hash = "sha512-TlAr6mgufYAEVh+Rbx2i375vcYAk9qpQv4zYbzjqOpSn8b+FSpymZt2Or8+41EuqqRv1x4dueaeurJUsMy8OiA==";
+    url = "https://repo.yarnpkg.com/4.1.0/packages/yarnpkg-cli/bin/yarn.js";
+    hash = "sha512-W3vAVcrWMnPdon3xVwpdLrSp8Ds1s5TT1VOTwqVWChf1zvMJRLEdaki8vPwcOibWGKrncER3TFKbo2y3ca1bDw==";
   };
 
   cacheFolder = ".yarn/cache";
@@ -41,73 +41,21 @@ let
     export yarn_enable_nixify=false
   '';
 
-  # Create derivations for fetching dependencies.
-  cacheDrvs = let
-    builder = writeShellScript "yarn-cache-builder" ''
-      source $stdenv/setup
-      cd "$src"
-      ${buildVars}
-      HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$TMP" \
-        yarn nixify fetch-one $locator
-      # Because we change the cache dir, Yarn may generate a different name.
-      mv "$TMP/$(sed 's/-[^-]*\.[^-]*$//' <<< "$outputFilename")"-* $out
-    '';
-  in lib.mapAttrs (locator: { filename, sha512 }: stdenv.mkDerivation {
-    inherit src builder locator;
-    name = lib.strings.sanitizeDerivationName locator;
+  cacheDrv = stdenv.mkDerivation {
+    name = "yarn-cache";
     buildInputs = [ yarn git cacert ];
-    outputFilename = filename;
-    outputHashMode = "flat";
-    outputHashAlgo = "sha512";
-    outputHash = sha512;
-  }) cacheEntries;
-
-  # Create a shell snippet to copy dependencies from a list of derivations.
-  mkCacheBuilderForDrvs = drvs:
-    writeShellScript "collect-yarn-cache" (lib.concatMapStrings (drv: ''
-      cp ${drv} '${drv.outputFilename}'
-    '') drvs);
-
-  # Create a shell snippet to copy dependencies from a list of locators.
-  mkCacheBuilderForLocators = let
-    pickCacheDrvs = map (locator: cacheDrvs.${locator});
-  in locators:
-    mkCacheBuilderForDrvs (pickCacheDrvs locators);
-
-  # Create a derivation that builds a node-pre-gyp module in isolation.
-  mkIsolatedBuild = { pname, version, reference, locators }: stdenv.mkDerivation (drvCommon // {
-    inherit pname version;
-    dontUnpack = true;
-
-    configurePhase = ''
+    buildCommand = ''
+      cp --reflink=auto --recursive '${src}' ./src
+      cd ./src/
       ${buildVars}
-      unset yarn_enable_nixify # plugin is not present
+      HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$out" \
+        yarn nixify fetch
+      rm $out/.gitignore
     '';
+    outputHashMode = "recursive";
+    outputHash = "sha512-OAt+xFW89iuT/0pW7qPI4vNBID1jCTtYd2zPBIcjlfPx0YCc2HpQLSPKKjmff4YtYWJEJkMQMaypzSUDt1hVFQ==";
+  };
 
-    buildPhase = ''
-      mkdir -p .yarn/cache
-      pushd .yarn/cache > /dev/null
-      source ${mkCacheBuilderForLocators locators}
-      popd > /dev/null
-
-      echo '{ "dependencies": { "${pname}": "${reference}" } }' > package.json
-      install -m 0600 ${lockfile} ./yarn.lock
-      export yarn_global_folder="$TMP"
-      export yarn_enable_global_cache=false
-      export yarn_enable_immutable_installs=false
-      yarn --immutable-cache
-    '';
-
-    installPhase = ''
-      unplugged=( .yarn/unplugged/${pname}-*/node_modules/* )
-      if [[ ! -e "''${unplugged[@]}" ]]; then
-        echo >&2 "Could not find the unplugged path for ${pname}"
-        exit 1
-      fi
-
-      mv "$unplugged" $out
-    '';
-  });
 
   # Main project derivation.
   project = stdenv.mkDerivation (drvCommon // {
@@ -120,9 +68,7 @@ let
       # Copy over the Yarn cache.
       rm -fr '${cacheFolder}'
       mkdir -p '${cacheFolder}'
-      pushd '${cacheFolder}' > /dev/null
-      source ${mkCacheBuilderForDrvs (lib.attrValues cacheDrvs)}
-      popd > /dev/null
+      cp --reflink=auto --recursive ${cacheDrv}/* '${cacheFolder}/'
 
       # Yarn may need a writable home directory.
       export yarn_global_folder="$TMP"
@@ -142,13 +88,7 @@ let
       # hardcoded values.
       runHook preConfigure
 
-      # Copy in isolated builds.
-      echo 'injecting build for canvas'
-      yarn nixify inject-build \
-        "canvas@npm:2.11.2" \
-        ${isolated."canvas@npm:2.11.2"} \
-        ".yarn/unplugged/canvas-npm-2.11.2-824d893a31/node_modules/canvas"
-      echo 'running yarn install'
+
 
       # Run normal Yarn install to complete dependency installation.
       yarn install --immutable --immutable-cache
@@ -175,14 +115,14 @@ let
         # - Otherwise all files are copied.
         yarn pack --out package.tgz
         mkdir -p "$out/libexec/$name"
-        tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
+        tar xzf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
-        cp .yarnrc* "$out/libexec/$name"
-        cp ${lockfile} "$out/libexec/$name/yarn.lock"
-        cp --recursive .yarn "$out/libexec/$name"
+        cp --reflink=auto .yarnrc* "$out/libexec/$name"
+        cp --reflink=auto ${lockfile} "$out/libexec/$name/yarn.lock"
+        cp --reflink=auto --recursive .yarn "$out/libexec/$name"
 
         # Copy the Yarn linker output into the package.
-        cp .pnp.* "$out/libexec/$name"
+        cp --reflink=auto .pnp.* "$out/libexec/$name"
       fi
 
       cd "$out/libexec/$name"
@@ -206,489 +146,6 @@ let
 
   overriddenProject = optionalOverride overrideAttrs project;
 
-cacheEntries = {
-"@digitalbazaar/http-client@npm:3.4.1" = { filename = "@digitalbazaar-http-client-npm-3.4.1-8f7eac0be7-218240da52.zip"; sha512 = "218240da52e7303a63e822448fb6dc2eb3a42d0418f51fd9240b267703ffad2e45c17df01d5d8f6886ea8d0cdcf65ee929ae5377703c0e9d2db4f68313f8246c"; };
-"@fastify/busboy@npm:2.1.0" = { filename = "@fastify-busboy-npm-2.1.0-960844a007-7bb641080a.zip"; sha512 = "7bb641080aac7cf01d88749ad331af10ba9ec3713ec07cabbe833908c75df21bd56249bb6173bdec07f5a41896b21e3689316f86684c06635da45f91ff4565a2"; };
-"@isaacs/cliui@npm:8.0.2" = { filename = "@isaacs-cliui-npm-8.0.2-f4364666d5-b1bf42535d.zip"; sha512 = "b1bf42535d49f11dc137f18d5e4e63a28c5569de438a221c369483731e9dac9fb797af554e8bf02b6192d1e5eba6e6402cf93900c3d0ac86391d00d04876789e"; };
-"@koa/router@npm:12.0.1" = { filename = "@koa-router-npm-12.0.1-6a9764e4df-978a668a88.zip"; sha512 = "978a668a88dad8cba38afe0df537b95f6d49bdaa60af5f479240fde3a87a7046cf8c068a58c355442335794db5cb583b88ca07a4b65f217b44925a7ce99ccc1d"; };
-"@mapbox/node-pre-gyp@npm:1.0.11" = { filename = "@mapbox-node-pre-gyp-npm-1.0.11-5547f15a2b-2b24b93c31.zip"; sha512 = "2b24b93c31beca1c91336fa3b3769fda98e202fb7f9771f0f4062588d36dcc30fcf8118c36aa747fa7f7610d8cf601872bdaaf62ce7822bb08b545d1bbe086cc"; };
-"@npmcli/agent@npm:2.2.0" = { filename = "@npmcli-agent-npm-2.2.0-cf04e8a830-7b89590598.zip"; sha512 = "7b89590598476dda88e79c473766b67c682aae6e0ab0213491daa6083dcc0c171f86b3868f5506f22c09aa5ea69ad7dfb78f4bf39a8dca375d89a42f408645b3"; };
-"@npmcli/fs@npm:3.1.0" = { filename = "@npmcli-fs-npm-3.1.0-0844a57978-162b4a0b87.zip"; sha512 = "162b4a0b8705cd6f5c2470b851d1dc6cd228c86d2170e1769d738c1fbb69a87160901411c3c035331e9e99db72f1f1099a8b734bf1637cc32b9a5be1660e4e1e"; };
-"@pkgjs/parseargs@npm:0.11.0" = { filename = "@pkgjs-parseargs-npm-0.11.0-cd2a3fe948-5bd7576bb1.zip"; sha512 = "5bd7576bb1b38a47a7fc7b51ac9f38748e772beebc56200450c4a817d712232b8f1d3ef70532c80840243c657d491cf6a6be1e3a214cff907645819fdc34aadd"; };
-"@rdfjs/data-model@npm:1.3.4" = { filename = "@rdfjs-data-model-npm-1.3.4-65acf42a87-2f9f04b0f7.zip"; sha512 = "2f9f04b0f74cbcfd90b521eb51d7ab708164df16cc582ea4322dc364f66ad39ca9f1fc52d0db0b1c93e3043e86a5568ab2ecf66d7633051714e853e02e793ce8"; };
-"@rdfjs/types@npm:1.1.0" = { filename = "@rdfjs-types-npm-1.1.0-a00e1e81cf-ed18e5eded.zip"; sha512 = "ed18e5eded11fba0b297b19ecc51422e9d7d9ef121759a7023a949794092738075cb834f9d6da906a39aa75eb1ba18eb5256a1871f67754d654540892a55ea42"; };
-"@types/accepts@npm:1.3.7" = { filename = "@types-accepts-npm-1.3.7-96df7c6899-7b21efc78b.zip"; sha512 = "7b21efc78b98ed57063ac31588f871f11501c080cd1201ca3743cf02ee0aee74bdb5a634183bc0987dc8dc582b26316789fd203650319ccc89a66cf88311d64f"; };
-"@types/body-parser@npm:1.19.5" = { filename = "@types-body-parser-npm-1.19.5-97fb106976-aebeb200f2.zip"; sha512 = "aebeb200f25e8818d8cf39cd0209026750d77c9b85381cdd8deeb50913e4d18a1ebe4b74ca9b0b4d21952511eeaba5e9fbbf739b52731a2061e206ec60d568df"; };
-"@types/chai@npm:4.3.11" = { filename = "@types-chai-npm-4.3.11-db685c5f0e-0c216ac4a1.zip"; sha512 = "0c216ac4a19bfbf8318bb104d32e50704ee2ffc4b538b976c4326e6638fee121462402caa570662227a2a218810388aadb14bdbd3d3d474ec300b00695db448a"; };
-"@types/co-body@npm:6.1.3" = { filename = "@types-co-body-npm-6.1.3-187348a50c-3a716829b7.zip"; sha512 = "3a716829b7c8fa5b3d18bc47b98756d60b2ebc302ec90601e1ac1aed34bcc1f7ee88f379b2531837a42902d14362bfa29c9ddc2a39bbc8030afc26d66e671b0d"; };
-"@types/connect@npm:3.4.38" = { filename = "@types-connect-npm-3.4.38-a8a4c38337-2e1cdba2c4.zip"; sha512 = "2e1cdba2c410f25649e77856505cd60223250fa12dff7a503e492208dbfdd25f62859918f28aba95315251fd1f5e1ffbfca1e25e73037189ab85dd3f8d0a148c"; };
-"@types/content-disposition@npm:0.5.8" = { filename = "@types-content-disposition-npm-0.5.8-0074adf6a1-f10baeab2e.zip"; sha512 = "f10baeab2ec44579012c1170763851687e740ea30531a80cd7a403475730ce7d7ead4f88927cea6970cc2d5e74fa7af38cdf4f039c5f115fba1bb98ec0014977"; };
-"@types/cookies@npm:0.7.10" = { filename = "@types-cookies-npm-0.7.10-61e9fb574b-09f245abbc.zip"; sha512 = "09f245abbcd9e348ef8a5747a1a7210b21412124cf69add28313f0ac34ad73bc23c03ea8b83aa1708dd1a8e1bbc65bfc167eb9ae8324ecbedc3ec168e2fda2bf"; };
-"@types/debug@npm:4.1.12" = { filename = "@types-debug-npm-4.1.12-82a3fc4905-5dcd465edb.zip"; sha512 = "5dcd465edbb5a7f226e9a5efd1f399c6172407ef5840686b73e3608ce135eeca54ae8037dcd9f16bdb2768ac74925b820a8b9ecc588a58ca09eca6acabe33e2f"; };
-"@types/ejs@npm:3.1.5" = { filename = "@types-ejs-npm-3.1.5-b9db7fa2d7-13d994cf03.zip"; sha512 = "13d994cf0323d7e0ad33b9384914ccd3b4cd8bf282eced3649b1621b66ee7c784ac2d120a9d7b1f43d6f873518248fb8c3221b06a649b847860b9c2389a0b0ed"; };
-"@types/express-serve-static-core@npm:4.17.41" = { filename = "@types-express-serve-static-core-npm-4.17.41-7d196a92fa-dc166cbf44.zip"; sha512 = "dc166cbf4475c00a81fbcab120bf7477c527184be11ae149df7f26d9c1082114c68f8d387a2926fe80291b06477c8bbd9231ff4f5775de328e887695aefce269"; };
-"@types/express@npm:4.17.21" = { filename = "@types-express-npm-4.17.21-be92a0245e-12e562c457.zip"; sha512 = "12e562c4571da50c7d239e117e688dc434db1bac8be55613294762f84fd77fbd0658ccd553c7d3ab02408f385bc93980992369dd30e2ecd2c68c358e6af8fabf"; };
-"@types/http-assert@npm:1.5.5" = { filename = "@types-http-assert-npm-1.5.5-9b7e98e85c-02e7ba584d.zip"; sha512 = "02e7ba584d6d14bdb4dad05dd36ecbc4a2f4209472287e6d558e222c93182214445a0c6cd096f114bfc88446be03d82ef6db24ecda13922b0d697918c76b4067"; };
-"@types/http-cache-semantics@npm:4.0.4" = { filename = "@types-http-cache-semantics-npm-4.0.4-6d4f413ddd-51b72568b4.zip"; sha512 = "51b72568b4b2863e0fe8d6ce8aad72a784b7510d72dc866215642da51d84945a9459fa89f49ec48f1e9a1752e6a78e85a4cda0ded06b1c73e727610c925f9ce6"; };
-"@types/http-errors@npm:2.0.4" = { filename = "@types-http-errors-npm-2.0.4-8b39ca5d7c-494670a57a.zip"; sha512 = "494670a57ad4062fee6c575047ad5782506dd35a6b9ed3894cea65830a94367bd84ba302eb3dde331871f6d70ca287bfedb1b2cf658e6132cd2cbd427ab56836"; };
-"@types/keygrip@npm:1.0.6" = { filename = "@types-keygrip-npm-1.0.6-25e224891d-1045a79913.zip"; sha512 = "1045a79913259f539ac1d04384ea8f61cf29f1d299040eb4b67d92304ec3bcea59b7e4b83cf95a73aa251ff62e55924e380d0c563a21fe8f6e91de20cc610386"; };
-"@types/koa-compose@npm:3.2.8" = { filename = "@types-koa-compose-npm-3.2.8-f62156b53c-f2bfb7376c.zip"; sha512 = "f2bfb7376c1e9075e8df7a46a5fce073159b01b94ec7dcca6e9f68627d48ea86a726bcfbd06491e1c99f68c0f27b8174b498081f9a3e4f976694452b5d0b5f01"; };
-"@types/koa@npm:2.13.12" = { filename = "@types-koa-npm-2.13.12-bd59f05d50-df28727246.zip"; sha512 = "df28727246cc318ecf8f5672ff6b6201bef915a53c44c4c01614027601ff6e917e7188872df16bfe854293ba250fc6260dcc3e3ce071ddfe0f8403f40a5d8234"; };
-"@types/koa__router@npm:12.0.4" = { filename = "@types-koa__router-npm-12.0.4-812b24cc2a-bc783b47d3.zip"; sha512 = "bc783b47d3c2a6bb8171ba3ddffa5781c5ed11e6b716e74281dfb71229ceb3189ddf5ac178e6f9552ca9d43e8370e0bd558054d66439b43a9e500d046a15ffa8"; };
-"@types/mime@npm:1.3.5" = { filename = "@types-mime-npm-1.3.5-48d28990db-c2ee31cd9b.zip"; sha512 = "c2ee31cd9b993804df33a694d5aa3fa536511a49f2e06eeab0b484fef59b4483777dbb9e42a4198a0809ffbf698081fdbca1e5c2218b82b91603dfab10a10fbc"; };
-"@types/mime@npm:3.0.4" = { filename = "@types-mime-npm-3.0.4-5cb286d662-db478bc0f9.zip"; sha512 = "db478bc0f99e40f7b3e01d356a9bdf7817060808a294978111340317bcd80ca35382855578c5b60fbc84ae449674bd9bb38427b18417e1f8f19e4f72f8b242cd"; };
-"@types/mocha@npm:10.0.6" = { filename = "@types-mocha-npm-10.0.6-a687c1962c-4526c9e883.zip"; sha512 = "4526c9e88388f9e1004c6d3937c5488a39908810f26b927173c58d52b43057f3895627dc06538e96706e08b88158885f869ec6311f6b58fd72bdef715f26d6c3"; };
-"@types/ms@npm:0.7.34" = { filename = "@types-ms-npm-0.7.34-46f5141bfd-ac80bd9001.zip"; sha512 = "ac80bd90012116ceb2d188fde62d96830ca847823e8ca71255616bc73991aa7d9f057b8bfab79e8ee44ffefb031ddd1bcce63ea82f9e66f7c31ec02d2d823ccc"; };
-"@types/node@npm:20.9.4" = { filename = "@types-node-npm-20.9.4-a4808c97df-c8b48ace4c.zip"; sha512 = "c8b48ace4c7e17715fa901201c98275f8e5268cf5895a8d149777eb0ec6c3ef6c831ff3917e92da5453a5dbe13f230caa50b348a0601b0d50eb9e628010c0364"; };
-"@types/pg@npm:8.10.9" = { filename = "@types-pg-npm-8.10.9-ee8620c8e7-6b3bec7230.zip"; sha512 = "6b3bec7230d09da6459636a66dfd6fb538378e466ffff0a0bcd07d67aa4ddce49c73afc7442f53adec92a49dbf9e71d8d847e0075750d7545331735dfd92d22c"; };
-"@types/qs@npm:6.9.10" = { filename = "@types-qs-npm-6.9.10-ce6b6e69f0-6be12e5f06.zip"; sha512 = "6be12e5f062d1b41eb037d59bf9cb65bc9410cedd5e6da832dfd7c8e2b3f4c91e81c9b90b51811140770e5052c6c4e8361181bd9437ddcd4515dc128b7c00353"; };
-"@types/range-parser@npm:1.2.7" = { filename = "@types-range-parser-npm-1.2.7-a83c0b6429-361bb3e964.zip"; sha512 = "361bb3e964ec5133fa40644a0b942279ed5df1949f21321d77de79f48b728d39253e5ce0408c9c17e4e0fd95ca7899da36841686393b9f7a1e209916e9381a3c"; };
-"@types/rdf-js@npm:4.0.1" = { filename = "@types-rdf-js-npm-4.0.1-d7342ebf4f-643217b080.zip"; sha512 = "643217b080f833e5757c5c6446c84c3b9e5c5cd8aba9c6108619025d1d20bde203fa6d6190b2cd063a823ebfcc78eed3cd69cbb0740ab948c6a082b7a923b938"; };
-"@types/send@npm:0.17.4" = { filename = "@types-send-npm-0.17.4-9d7c55577f-7f17fa696c.zip"; sha512 = "7f17fa696cb83be0a104b04b424fdedc7eaba1c9a34b06027239aba513b398a0e2b7279778af521f516a397ced417c96960e5f50fcfce40c4bc4509fb1a5883c"; };
-"@types/serve-static@npm:1.15.5" = { filename = "@types-serve-static-npm-1.15.5-b911ffc092-811d1a2f7e.zip"; sha512 = "811d1a2f7e74a872195e7a013bcd87a2fb1edf07eaedcb9dcfd20c1eb4bc56ad4ea0d52141c13192c91ccda7c8aeb8a530d8a7e60b9c27f5990d7e62e0fecb03"; };
-"@types/uuid@npm:9.0.7" = { filename = "@types-uuid-npm-9.0.7-c380bb8654-b329ebd4f9.zip"; sha512 = "b329ebd4f9d1d8e08d4f2cc211be4922d70d1149f73d5772630e4a3acfb5170c6d37b3d7a39a0412f1a56e86e8a844c7f297c798b082f90380608bf766688787"; };
-"abbrev@npm:1.1.1" = { filename = "abbrev-npm-1.1.1-3659247eab-3f76267770.zip"; sha512 = "3f762677702acb24f65e813070e306c61fafe25d4b2583f9dfc935131f774863f3addd5741572ed576bd69cabe473c5af18e1e108b829cb7b6b4747884f726e6"; };
-"abbrev@npm:2.0.0" = { filename = "abbrev-npm-2.0.0-0eb38a17e5-f742a5a107.zip"; sha512 = "f742a5a107473946f426c691c08daba61a1d15942616f300b5d32fd735be88fef5cba24201757b6c407fd564555fb48c751cfa33519b2605c8a7aadd22baf372"; };
-"abort-controller@npm:3.0.0" = { filename = "abort-controller-npm-3.0.0-2f3a9a2bcb-90ccc50f01.zip"; sha512 = "90ccc50f010250152509a344eb2e71977fbf8db0ab8f1061197e3275ddf6c61a41a6edfd7b9409c664513131dd96e962065415325ef23efa5db931b382d24ca5"; };
-"accepts@npm:1.3.8" = { filename = "accepts-npm-1.3.8-9a812371c9-3a35c5f558.zip"; sha512 = "3a35c5f5586cfb9a21163ca47a5f77ac34fa8ceb5d17d2fa2c0d81f41cbd7f8c6fa52c77e2c039acc0f4d09e71abdc51144246900f6bef5e3c4b333f77d89362"; };
-"agent-base@npm:6.0.2" = { filename = "agent-base-npm-6.0.2-428f325a93-dc4f757e40.zip"; sha512 = "dc4f757e40b5f3e3d674bc9beb4f1048f4ee83af189bae39be99f57bf1f48dde166a8b0a5342a84b5944ee8e6ed1e5a9d801858f4ad44764e84957122fe46261"; };
-"agent-base@npm:7.1.0" = { filename = "agent-base-npm-7.1.0-4b12ba5111-fc974ab57f.zip"; sha512 = "fc974ab57ffdd8421a2bc339644d312a9cca320c20c3393c9d8b1fd91731b9bbabdb985df5fc860f5b79d81c3e350daa3fcb31c5c07c0bb385aafc817df004ce"; };
-"aggregate-error@npm:3.1.0" = { filename = "aggregate-error-npm-3.1.0-415a406f4e-a42f67faa7.zip"; sha512 = "a42f67faa79e3e6687a4923050e7c9807db3848a037076f791d10e092677d65c1d2d863b7848560699f40fc0502c19f40963fb1cd1fb3d338a7423df8e45e039"; };
-"ansi-colors@npm:4.1.1" = { filename = "ansi-colors-npm-4.1.1-97ad42f223-6086ade433.zip"; sha512 = "6086ade4336b4250b6b25e144b83e5623bcaf654d3df0c3546ce09c9c5ff999cb6a6f00c87e802d05cf98aef79d92dc76ade2670a2493b8dcb80220bec457838"; };
-"ansi-regex@npm:5.0.1" = { filename = "ansi-regex-npm-5.0.1-c963a48615-9a64bb8627.zip"; sha512 = "9a64bb8627b434ba9327b60c027742e5d17ac69277960d041898596271d992d4d52ba7267a63ca10232e29f6107fc8a835f6ce8d719b88c5f8493f8254813737"; };
-"ansi-regex@npm:6.0.1" = { filename = "ansi-regex-npm-6.0.1-8d663a607d-cbe16dbd2c.zip"; sha512 = "cbe16dbd2c6b2735d1df7976a7070dd277326434f0212f43abf6d87674095d247968209babdaad31bb00882fa68807256ba9be340eec2f1004de14ca75f52a08"; };
-"ansi-styles@npm:4.3.0" = { filename = "ansi-styles-npm-4.3.0-245c7d42c7-895a23929d.zip"; sha512 = "895a23929da416f2bd3de7e9cb4eabd340949328ab85ddd6e484a637d8f6820d485f53933446f5291c3b760cbc488beb8e88573dd0f9c7daf83dccc8fe81b041"; };
-"ansi-styles@npm:6.2.1" = { filename = "ansi-styles-npm-6.2.1-d43647018c-5d1ec38c12.zip"; sha512 = "5d1ec38c123984bcedd996eac680d548f31828bd679a66db2bdf11844634dde55fec3efa9c6bb1d89056a5e79c1ac540c4c784d592ea1d25028a92227d2f2d5c"; };
-"anymatch@npm:3.1.3" = { filename = "anymatch-npm-3.1.3-bc81d103b1-57b06ae984.zip"; sha512 = "57b06ae984bc32a0d22592c87384cd88fe4511b1dd7581497831c56d41939c8a001b28e7b853e1450f2bf61992dfcaa8ae2d0d161a0a90c4fb631ef07098fbac"; };
-"aproba@npm:2.0.0" = { filename = "aproba-npm-2.0.0-8716bcfde6-d06e26384a.zip"; sha512 = "d06e26384a8f6245d8c8896e138c0388824e259a329e0c9f196b4fa533c82502a6fd449586e3604950a0c42921832a458bb3aa0aa9f0ba449cfd4f50fd0d09b5"; };
-"are-we-there-yet@npm:2.0.0" = { filename = "are-we-there-yet-npm-2.0.0-7d2f5201ce-375f753c10.zip"; sha512 = "375f753c10329153c8d66dc95e8f8b6c7cc2aa66e05cb0960bd69092b10dae22900cacc7d653ad11d26b3ecbdbfe1e8bfb6ccf0265ba8077a7d979970f16b99c"; };
-"argparse@npm:2.0.1" = { filename = "argparse-npm-2.0.1-faff7999e6-c5640c2d89.zip"; sha512 = "c5640c2d89045371c7cedd6a70212a04e360fd34d6edeae32f6952c63949e3525ea77dbec0289d8213a99bbaeab5abfa860b5c12cf88a2e6cf8106e90dd27a7e"; };
-"assertion-error@npm:1.1.0" = { filename = "assertion-error-npm-1.1.0-66b893015e-25456b2aa3.zip"; sha512 = "25456b2aa333250f01143968e02e4884a34588a8538fbbf65c91a637f1dbfb8069249133cd2f4e530f10f624d206a664e7df30207830b659e9f5298b00a4099b"; };
-"async@npm:3.2.5" = { filename = "async-npm-3.2.5-f5dbdabdfc-1408287b26.zip"; sha512 = "1408287b26c6db67d45cb346e34892cee555b8b59e6c68e6f8c3e495cad5ca13b4f218180e871f3c2ca30df4ab52693b66f2f6ff43644760cab0b2198bda79c1"; };
-"balanced-match@npm:1.0.2" = { filename = "balanced-match-npm-1.0.2-a53c126459-9308baf0a7.zip"; sha512 = "9308baf0a7e4838a82bbfd11e01b1cb0f0cf2893bc1676c27c2a8c0e70cbae1c59120c3268517a8ae7fb6376b4639ef81ca22582611dbee4ed28df945134aaee"; };
-"binary-extensions@npm:2.2.0" = { filename = "binary-extensions-npm-2.2.0-180c33fec7-d73d8b8972.zip"; sha512 = "d73d8b897238a2d3ffa5f59c0241870043aa7471335e89ea5e1ff48edb7c2d0bb471517a3e4c5c3f4c043615caa2717b5f80a5e61e07503d51dc85cb848e665d"; };
-"brace-expansion@npm:1.1.11" = { filename = "brace-expansion-npm-1.1.11-fb95eb05ad-695a56cd05.zip"; sha512 = "695a56cd058096a7cb71fb09d9d6a7070113c7be516699ed361317aca2ec169f618e28b8af352e02ab4233fb54eb0168460a40dc320bab0034b36ab59aaad668"; };
-"brace-expansion@npm:2.0.1" = { filename = "brace-expansion-npm-2.0.1-17aa2616f9-b358f2fe06.zip"; sha512 = "b358f2fe060e2d7a87aa015979ecea07f3c37d4018f8d6deb5bd4c229ad3a0384fe6029bb76cd8be63c81e516ee52d1a0673edbe2023d53a5191732ae3c3e49f"; };
-"braces@npm:3.0.2" = { filename = "braces-npm-3.0.2-782240b28a-321b4d6757.zip"; sha512 = "321b4d675791479293264019156ca322163f02dc06e3c4cab33bb15cd43d80b51efef69b0930cfde3acd63d126ebca24cd0544fa6f261e093a0fb41ab9dda381"; };
-"browser-stdout@npm:1.3.1" = { filename = "browser-stdout-npm-1.3.1-6b2376bf3f-c40e482fd8.zip"; sha512 = "c40e482fd82be872b6ea7b9f7591beafbf6f5ba522fe3dade98ba1573a1c29a11101564993e4eb44e5488be8f44510af072df9a9637c739217eb155ceb639205"; };
-"buffer-writer@npm:2.0.0" = { filename = "buffer-writer-npm-2.0.0-5cd2ef55bc-c91b2ab09a.zip"; sha512 = "c91b2ab09a200cf0862237e5a4dbd5077003b42d26d4f0c596ec7149f82ef83e0751d670bcdf379ed988d1a08c0fac7759a8cb928cf1a4710a1988a7618b1190"; };
-"bytes@npm:3.1.2" = { filename = "bytes-npm-3.1.2-28b8643004-76d1c43cbd.zip"; sha512 = "76d1c43cbd602794ad8ad2ae94095cddeb1de78c5dddaa7005c51af10b0176c69971a6d88e805a90c2b6550d76636e43c40d8427a808b8645ede885de4a0358e"; };
-"cacache@npm:18.0.0" = { filename = "cacache-npm-18.0.0-32582cfebc-e359823778.zip"; sha512 = "e359823778d712ad365740cef3f488d4f74c62cc79be5935896d9597a7d81033e50c54c15898fa9cc018620879307ab30d1dddc476ae705bfd5b29c145ae6938"; };
-"cache-content-type@npm:1.0.1" = { filename = "cache-content-type-npm-1.0.1-f709f8c309-59b50e29e6.zip"; sha512 = "59b50e29e64a24bb52a16e5d35b69ad27ef14313701acc5e462b0aeebf2f09ff87fb6538eb0c0f0de4de05c8a1eecaef47f455f5b4928079e68f607f816a0843"; };
-"call-bind@npm:1.0.5" = { filename = "call-bind-npm-1.0.5-65600fae47-a6172c168f.zip"; sha512 = "a6172c168fd6dacf744fcde745099218056bd755c50415b592655dcd6562157ed29f130f56c3f6db2250f67e4bd62e5c218cdc56d7bfd76e0bda50770fce2d10"; };
-"camelcase@npm:6.3.0" = { filename = "camelcase-npm-6.3.0-e5e42a0d15-0d70165821.zip"; sha512 = "0d701658219bd3116d12da3eab31acddb3f9440790c0792e0d398f0a520a6a4058018e546862b6fba89d7ae990efaeb97da71e1913e9ebf5a8b5621a3d55c710"; };
-"canonicalize@npm:1.0.8" = { filename = "canonicalize-npm-1.0.8-e87a0e7ee4-6fafcfa738.zip"; sha512 = "6fafcfa73855a49c86eed26d2f23734713a542a3107a23a6ab16fb22b6cee6bb2d92ad32b2244d52594bd69bc08bec820413911cd566dcc5399048012ce26a83"; };
-"canvas@npm:2.11.2" = { filename = "canvas-npm-2.11.2-824d893a31-943368798a.zip"; sha512 = "943368798ad1b66b18633aa34b6181e1038dac5433fc9727cd07be35f0a633f572b60d9edb95f5ff90b6a9128e86d5312035f91a2934101c73185b15d906230a"; };
-"chai@npm:4.3.10" = { filename = "chai-npm-4.3.10-96f52a35f0-c887d24f67.zip"; sha512 = "c887d24f67be6fb554c7ebbde3bb0568697a8833d475e4768296916891ba143f25fc079f6eb34146f3dd5a3279d34c1f387c32c9a6ab288e579f948d9ccf53fe"; };
-"chalk@npm:4.1.2" = { filename = "chalk-npm-4.1.2-ba8b67ab80-4a3fef5cc3.zip"; sha512 = "4a3fef5cc34975c898ffe77141450f679721df9dde00f6c304353fa9c8b571929123b26a0e4617bde5018977eb655b31970c297b91b63ee83bb82aeb04666880"; };
-"check-error@npm:1.0.3" = { filename = "check-error-npm-1.0.3-137994eabc-94aa37a731.zip"; sha512 = "94aa37a7315c0e8a83d0112b5bfb5a8624f7f0f81057c73e4707729cdd8077166c6aefb3d8e2b92c63ee130d4a2ff94bad46d547e12f3238cc1d78342a973841"; };
-"chokidar@npm:3.5.3" = { filename = "chokidar-npm-3.5.3-c5f9b0a56a-1076953093.zip"; sha512 = "1076953093e0707c882a92c66c0f56ba6187831aa51bb4de878c1fec59ae611a3bf02898f190efec8e77a086b8df61c2b2a3ea324642a0558bdf8ee6c5dc9ca1"; };
-"chownr@npm:2.0.0" = { filename = "chownr-npm-2.0.0-638f1c9c61-594754e130.zip"; sha512 = "594754e1303672171cc04e50f6c398ae16128eb134a88f801bf5354fd96f205320f23536a045d9abd8b51024a149696e51231565891d4efdab8846021ecf88e6"; };
-"clean-stack@npm:2.2.0" = { filename = "clean-stack-npm-2.2.0-a8ce435a5c-1f90262d5f.zip"; sha512 = "1f90262d5f6230a17e27d0c190b09d47ebe7efdd76a03b5a1127863f7b3c9aec4c3e6c8bb3a7bbf81d553d56a1fd35728f5a8ef4c63f867ac8d690109742a8c1"; };
-"cliui@npm:7.0.4" = { filename = "cliui-npm-7.0.4-d6b8a9edb6-6035f5daf7.zip"; sha512 = "6035f5daf7383470cef82b3d3db00bec70afb3423538c50394386ffbbab135e26c3689c41791f911fa71b62d13d3863c712fdd70f0fbdffd938a1e6fd09aac00"; };
-"co-body@npm:6.1.0" = { filename = "co-body-npm-6.1.0-8102b96671-54f5aa6e8d.zip"; sha512 = "54f5aa6e8dcc2961259a6e120807430d3ebe3d3f683e0e5b2747f547d142dfa045b7a0becbc46d13f0cb87b52e99b011090203b447cefc8587e4df1932aa9e2a"; };
-"co@npm:4.6.0" = { filename = "co-npm-4.6.0-03f2d1feb6-c0e85ea0ca.zip"; sha512 = "c0e85ea0ca8bf0a50cbdca82efc5af0301240ca88ebe3644a6ffb8ffe911f34d40f8fbcf8f1d52c5ddd66706abd4d3bfcd64259f1e8e2371d4f47573b0dc8c28"; };
-"color-convert@npm:2.0.1" = { filename = "color-convert-npm-2.0.1-79730e935b-37e1150172.zip"; sha512 = "37e1150172f2e311fe1b2df62c6293a342ee7380da7b9cfdba67ea539909afbd74da27033208d01d6d5cfc65ee7868a22e18d7e7648e004425441c0f8a15a7d7"; };
-"color-name@npm:1.1.4" = { filename = "color-name-npm-1.1.4-025792b0ea-a1a3f91415.zip"; sha512 = "a1a3f914156960902f46f7f56bc62effc6c94e84b2cae157a526b1c1f74b677a47ec602bf68a61abfa2b42d15b7c5651c6dbe72a43af720bc588dff885b10f95"; };
-"color-support@npm:1.1.3" = { filename = "color-support-npm-1.1.3-3be5c53455-8ffeaa270a.zip"; sha512 = "8ffeaa270a784dc382f62d9be0a98581db43e11eee301af14734a6d089bd456478b1a8b3e7db7ca7dc5b18a75f828f775c44074020b51c05fc00e6d0992b1cc6"; };
-"concat-map@npm:0.0.1" = { filename = "concat-map-npm-0.0.1-85a921b7ee-c996b1cfdf.zip"; sha512 = "c996b1cfdf95b6c90fee4dae37e332c8b6eb7d106430c17d538034c0ad9a1630cb194d2ab37293b1bdd4d779494beee7786d586a50bd9376fd6f7bcc2bd4c98f"; };
-"console-control-strings@npm:1.1.0" = { filename = "console-control-strings-npm-1.1.0-e3160e5275-7ab51d30b5.zip"; sha512 = "7ab51d30b52d461412cd467721bb82afe695da78fff8f29fe6f6b9cbaac9a2328e27a22a966014df9532100f6dd85370460be8130b9c677891ba36d96a343f50"; };
-"content-disposition@npm:0.5.4" = { filename = "content-disposition-npm-0.5.4-2d93678616-bac0316ebf.zip"; sha512 = "bac0316ebfeacb8f381b38285dc691c9939bf0a78b0b7c2d5758acadad242d04783cee5337ba7d12a565a19075af1b3c11c728e1e4946de73c6ff7ce45f3f1bb"; };
-"content-type@npm:1.0.5" = { filename = "content-type-npm-1.0.5-3e037bf9ab-b76ebed15c.zip"; sha512 = "b76ebed15c000aee4678c3707e0860cb6abd4e680a598c0a26e17f0bfae723ec9cc2802f0ff1bc6e4d80603719010431d2231018373d4dde10f9ccff9dadf5af"; };
-"cookies@npm:0.8.0" = { filename = "cookies-npm-0.8.0-d7388cbd94-0af32f30d1.zip"; sha512 = "0af32f30d1ece0596efc05782c66b9d61659e20c6cc5b695452abf5ceb51883ef43c5c73d86badd7d028a0da7d39f864c95f33640aef04f97fad70f35986bea3"; };
-"cross-spawn@npm:7.0.3" = { filename = "cross-spawn-npm-7.0.3-e4ff3e65b3-5738c31238.zip"; sha512 = "5738c312387081c98d69c98e105b6327b069197f864a60593245d64c8089c8a0a744e16349281210d56835bb9274130d825a78b2ad6853ca13cfbeffc0c31750"; };
-"data-uri-to-buffer@npm:4.0.1" = { filename = "data-uri-to-buffer-npm-4.0.1-5c66a78beb-20a6b93107.zip"; sha512 = "20a6b93107597530d71d4cb285acee17f66bcdfc03fd81040921a81252f19db27588d87fc8fc69e1950c55cfb0bf8ae40d0e5e21d907230813eb5d5a7f9eb45b"; };
-"debug@npm:4.3.4" = { filename = "debug-npm-4.3.4-4513954577-cedbec4529.zip"; sha512 = "cedbec45298dd5c501d01b92b119cd3faebe5438c3917ff11ae1bff86a6c722930ac9c8659792824013168ba6db7c4668225d845c633fbdafbbf902a6389f736"; };
-"decamelize@npm:4.0.0" = { filename = "decamelize-npm-4.0.0-12410e3409-e06da03fc0.zip"; sha512 = "e06da03fc05333e8cd2778c1487da67ffbea5b84e03ca80449519b8fa61f888714bbc6f459ea963d5641b4aa98832130eb5cd193d90ae9f0a27eee14be8e278d"; };
-"decompress-response@npm:4.2.1" = { filename = "decompress-response-npm-4.2.1-abe5b4ebe4-5e4821be33.zip"; sha512 = "5e4821be332e80e3639acee2441c41d245fc07ac3ee85a6f28893c10c079d66d9bf09e8d84bffeae5656a4625e09e9b93fb4a5705adbe6b07202eea64fae1c8d"; };
-"deep-eql@npm:4.1.3" = { filename = "deep-eql-npm-4.1.3-020a64f862-ff34e8605d.zip"; sha512 = "ff34e8605d8253e1bf9fe48056e02c6f347b81d9b5df1c6650a1b0f6f847b4a86453b16dc226b34f853ef14b626e85d04e081b022e20b00cd7d54f079ce9bbdd"; };
-"deep-equal@npm:1.0.1" = { filename = "deep-equal-npm-1.0.1-f05565c4e5-bef838ef98.zip"; sha512 = "bef838ef9824e124d10335deb9c7540bfc9f2f0eab17ad1bb870d0eee83ee4e7e6f6f892e5eebc2bd82759a76676926ad5246180097e28e57752176ff7dae888"; };
-"define-data-property@npm:1.1.1" = { filename = "define-data-property-npm-1.1.1-2b5156d112-77ef6e0bce.zip"; sha512 = "77ef6e0bceb515e05b5913ab635a84d537cee84f8a7c37c77fdcb31fc5b80f6dbe81b33375e4b67d96aa04e6a0d8d4ea099e431d83f089af8d93adfb584bcb94"; };
-"delegates@npm:1.0.0" = { filename = "delegates-npm-1.0.0-9b1942d75f-ba05874b91.zip"; sha512 = "ba05874b91148e1db4bf254750c042bf2215febd23a6d3cda2e64896aef79745fbd4b9996488bd3cafb39ce19dbce0fd6e3b6665275638befffe1c9b312b91b5"; };
-"depd@npm:1.1.2" = { filename = "depd-npm-1.1.2-b0c8414da7-acb24aaf93.zip"; sha512 = "acb24aaf936ef9a227b6be6d495f0d2eb20108a9a6ad40585c5bda1a897031512fef6484e4fdbb80bd249fdaa82841fa1039f416ece03188e677ba11bcfda249"; };
-"depd@npm:2.0.0" = { filename = "depd-npm-2.0.0-b6c51a4b43-58bd06ec20.zip"; sha512 = "58bd06ec20e19529b06f7ad07ddab60e504d9e0faca4bd23079fac2d279c3594334d736508dc350e06e510aba5e22e4594483b3a6562ce7c17dd797f4cc4ad2c"; };
-"destroy@npm:1.2.0" = { filename = "destroy-npm-1.2.0-6a511802e2-bd7633942f.zip"; sha512 = "bd7633942f57418f5a3b80d5cb53898127bcf53e24cdf5d5f4396be471417671f0fee48a4ebe9a1e9defbde2a31280011af58a57e090ff822f589b443ed4e643"; };
-"detect-libc@npm:2.0.2" = { filename = "detect-libc-npm-2.0.2-03afa59137-a9f4ffcd27.zip"; sha512 = "a9f4ffcd2701525c589617d98afe5a5d0676c8ea82bcc4ed6f3747241b79f781d36437c59a5e855254c864d36a3e9f8276568b6b531c28d6e53b093a15703f11"; };
-"diff@npm:5.0.0" = { filename = "diff-npm-5.0.0-ad6900db18-08c5904779.zip"; sha512 = "08c5904779bbababcd31f1707657b1ad57f8a9b65e6f88d3fb501d09a965d5f8d73066898a7d3f35981f9e4101892c61d99175d421f3b759533213c253d91134"; };
-"dotenv@npm:16.3.1" = { filename = "dotenv-npm-16.3.1-e6d380a398-b95ff1bbe6.zip"; sha512 = "b95ff1bbe624ead85a3cd70dbd827e8e06d5f05f716f2d0cbc476532d54c7c9469c3bc4dd93ea519f6ad711cb522c00ac9a62b6eb340d5affae8008facc3fbd7"; };
-"eastasianwidth@npm:0.2.0" = { filename = "eastasianwidth-npm-0.2.0-c37eb16bd1-26f364ebcd.zip"; sha512 = "26f364ebcdb6395f95124fda411f63137a4bfb5d3a06453f7f23dfe52502905bd84e0488172e0f9ec295fdc45f05c23d5d91baf16bd26f0fe9acd777a188dc39"; };
-"ee-first@npm:1.1.1" = { filename = "ee-first-npm-1.1.1-33f8535b39-b5bb125ee9.zip"; sha512 = "b5bb125ee93161bc16bfe6e56c6b04de5ad2aa44234d8f644813cc95d861a6910903132b05093706de2b706599367c4130eb6d170f6b46895686b95f87d017b7"; };
-"ejs@npm:3.1.9" = { filename = "ejs-npm-3.1.9-e201b2088c-f0e249c791.zip"; sha512 = "f0e249c79128810f5f6d5cbf347fc906d86bb9384263db0b2a9004aea649f2bc2d112736de5716c509c80afb4721c47281bd5b57c757d3b63f1bf5ac5f885893"; };
-"emoji-regex@npm:8.0.0" = { filename = "emoji-regex-npm-8.0.0-213764015c-b6053ad399.zip"; sha512 = "b6053ad39951c4cf338f9092d7bfba448cdfd46fe6a2a034700b149ac9ffbc137e361cbd3c442297f86bed2e5f7576c1b54cc0a6bf8ef5106cc62f496af35010"; };
-"emoji-regex@npm:9.2.2" = { filename = "emoji-regex-npm-9.2.2-e6fac8d058-af014e759a.zip"; sha512 = "af014e759a72064cf66e6e694a7fc6b0ed3d8db680427b021a89727689671cefe9d04151b2cad51dbaf85d5ba790d061cd167f1cf32eb7b281f6368b3c181639"; };
-"encodeurl@npm:1.0.2" = { filename = "encodeurl-npm-1.0.2-f8c8454c41-f6c2387379.zip"; sha512 = "f6c2387379a9e7c1156c1c3d4f9cb7bb11cf16dd4c1682e1f6746512564b053df5781029b6061296832b59fb22f459dbe250386d217c2f6e203601abb2ee0bec"; };
-"encoding@npm:0.1.13" = { filename = "encoding-npm-0.1.13-82a1837d30-36d938712f.zip"; sha512 = "36d938712ff00fe1f4bac88b43bcffb5930c1efa57bbcdca9d67e1d9d6c57cfb1200fb01efe0f3109b2ce99b231f90779532814a81370a1bd3274a0f58585039"; };
-"entities@npm:4.5.0" = { filename = "entities-npm-4.5.0-7cdb83b832-5b039739f7.zip"; sha512 = "5b039739f7621f5d1ad996715e53d964035f75ad3b9a4d38c6b3804bb226e282ffeae2443624d8fdd9c47d8e926ae9ac009c54671243f0c3294c26af7cc85250"; };
-"env-paths@npm:2.2.1" = { filename = "env-paths-npm-2.2.1-7c7577428c-285325677b.zip"; sha512 = "285325677bf00e30845e330eec32894f5105529db97496ee3f598478e50f008c5352a41a30e5e72ec9de8a542b5a570b85699cd63bd2bc646dbcb9f311d83bc4"; };
-"err-code@npm:2.0.3" = { filename = "err-code-npm-2.0.3-082e0ff9a7-b642f7b4dd.zip"; sha512 = "b642f7b4dd4a376e954947550a3065a9ece6733ab8e51ad80db727aaae0817c2e99b02a97a3d6cecc648a97848305e728289cf312d09af395403a90c9d4d8a66"; };
-"escalade@npm:3.1.1" = { filename = "escalade-npm-3.1.1-e02da076aa-afd02e6ca9.zip"; sha512 = "afd02e6ca91ffa813e1108b5e7756566173d6bc0d1eb951cb44d6b21702ec17c1cf116cfe75d4a2b02e05acb0b808a7a9387d0d1ca5cf9c04ad03a8445c3e46d"; };
-"escape-html@npm:1.0.3" = { filename = "escape-html-npm-1.0.3-376c22ee74-524c739d77.zip"; sha512 = "524c739d776b36c3d29fa08a22e03e8824e3b2fd57500e5e44ecf3cc4707c34c60f9ca0781c0e33d191f2991161504c295e98f68c78fe7baa6e57081ec6ac0a3"; };
-"escape-string-regexp@npm:4.0.0" = { filename = "escape-string-regexp-npm-4.0.0-4b531d8d59-9497d4dd30.zip"; sha512 = "9497d4dd307d845bd7f75180d8188bb17ea8c151c1edbf6b6717c100e104d629dc2dfb687686181b0f4b7d732c7dfdc4d5e7a8ff72de1b0ca283a75bbb3a9cd9"; };
-"event-target-shim@npm:5.0.1" = { filename = "event-target-shim-npm-5.0.1-cb48709025-0255d9f936.zip"; sha512 = "0255d9f936215fd206156fd4caa9e8d35e62075d720dc7d847e89b417e5e62cf1ce6c9b4e0a1633a9256de0efefaf9f8d26924b1f3c8620cffb9db78e7d3076b"; };
-"exponential-backoff@npm:3.1.1" = { filename = "exponential-backoff-npm-3.1.1-04df458b30-160456d2d6.zip"; sha512 = "160456d2d647e6019640bd07111634d8c353038d9fa40176afb7cd49b0548bdae83b56d05e907c2cce2300b81cae35d800ef92fefb9d0208e190fa3b7d6bb579"; };
-"fetch-blob@npm:3.2.0" = { filename = "fetch-blob-npm-3.2.0-28e01becfc-60054bf47b.zip"; sha512 = "60054bf47bfa10fb0ba6cb7742acec2f37c1f56344f79a70bb8b1c48d77675927c720ff3191fa546410a0442c998d27ab05e9144c32d530d8a52fbe68f843b69"; };
-"fetchache@npm:0.1.5" = { filename = "fetchache-npm-0.1.5-b63307ce7b-57016924fc.zip"; sha512 = "57016924fcb822c2fb73961a2ee9d84ba941df13b0188cb7fe56a0f7c0c697455205b46778792a7f85f95a0582852f443fb0b31f03a87b4e4fa018c3a169cd0b"; };
-"filelist@npm:1.0.4" = { filename = "filelist-npm-1.0.4-3a835ae0a7-426b1de394.zip"; sha512 = "426b1de3944a3d153b053f1c0ebfd02dccd0308a4f9e832ad220707a6d1f1b3c9784d6cadf6b2f68f09a57565f63ebc7bcdc913ccf8012d834f472c46e596f41"; };
-"fill-range@npm:7.0.1" = { filename = "fill-range-npm-7.0.1-b8b1817caa-7cdad7d426.zip"; sha512 = "7cdad7d426ffbaadf45aeb5d15ec675bbd77f7597ad5399e3d2766987ed20bda24d5fac64b3ee79d93276f5865608bb22344a26b9b1ae6c4d00bd94bf611623f"; };
-"find-up@npm:5.0.0" = { filename = "find-up-npm-5.0.0-e03e9b796d-062c5a83a9.zip"; sha512 = "062c5a83a9c02f53cdd6d175a37ecf8f87ea5bbff1fdfb828f04bfa021441bc7583e8ebc0872a4c1baab96221fb8a8a275a19809fb93fbc40bd69ec35634069a"; };
-"flat@npm:5.0.2" = { filename = "flat-npm-5.0.2-12748102a5-f178b13482.zip"; sha512 = "f178b13482f0cd80c7fede05f4d10585b1f2fdebf26e12edc138e32d3150c6ea6482b7f12813a1091143bad52bb6d3596bca51a162257a21163c0ff438baa5fe"; };
-"foreground-child@npm:3.1.1" = { filename = "foreground-child-npm-3.1.1-77e78ed774-9700a02856.zip"; sha512 = "9700a0285628abaeb37007c9a4d92bd49f67210f09067638774338e146c8e9c825c5c877f072b2f75f41dc6a2d0be8664f79ffc03f6576649f54a84fb9b47de0"; };
-"formdata-polyfill@npm:4.0.10" = { filename = "formdata-polyfill-npm-4.0.10-e03013c013-5392ec484f.zip"; sha512 = "5392ec484f9ce0d5e0d52fb5a78e7486637d516179b0eb84d81389d7eccf9ca2f663079da56f761355c0a65792810e3b345dc24db9a8bbbcf24ef3c8c88570c6"; };
-"fresh@npm:0.5.2" = { filename = "fresh-npm-0.5.2-ad2bb4c0a2-c6d27f3ed8.zip"; sha512 = "c6d27f3ed86cc5b601404822f31c900dd165ba63fff8152a3ef714e2012e7535027063bc67ded4cb5b3a49fa596495d46cacd9f47d6328459cf570f08b7d9e5a"; };
-"fs-minipass@npm:2.1.0" = { filename = "fs-minipass-npm-2.1.0-501ef87306-703d16522b.zip"; sha512 = "703d16522b8282d7299337539c3ed6edddd1afe82435e4f5b76e34a79cd74e488a8a0e26a636afc2440e1a23b03878e2122e3a2cfe375a5cf63c37d92b86a004"; };
-"fs-minipass@npm:3.0.3" = { filename = "fs-minipass-npm-3.0.3-d148d6ac19-63e80da2ff.zip"; sha512 = "63e80da2ff9b621e2cb1596abcb9207f1cf82b968b116ccd7b959e3323144cce7fb141462200971c38bbf2ecca51695069db45265705bed09a7cd93ae5b89f94"; };
-"fs.realpath@npm:1.0.0" = { filename = "fs.realpath-npm-1.0.0-c8f05d8126-444cf1291d.zip"; sha512 = "444cf1291d997165dfd4c0d58b69f0e4782bfd9149fd72faa4fe299e68e0e93d6db941660b37dd29153bf7186672ececa3b50b7e7249477b03fdf850f287c948"; };
-"fsevents@npm:2.3.3" = { filename = "fsevents-npm-2.3.3-ce9fb0ffae-a1f0c44595.zip"; sha512 = "a1f0c44595123ed717febbc478aa952e47adfc28e2092be66b8ab1635147254ca6cfe1df792a8997f22716d4cbafc73309899ff7bfac2ac3ad8cf2e4ecc3ec60"; };
-"fsevents@patch:fsevents@npm%3A2.3.3#optional!builtin<compat/fsevents>::version=2.3.3&hash=df0bf1" = { filename = "fsevents-patch-6b67494872-10c0.zip"; sha512 = "6a4a13116649608f65dfd42d5cb66801b08c48db6d8c359bcc32108b043a7c0010fe21a32b9e9324ee568963c496663857a58480618055f083a74fa325278fa2"; };
-"function-bind@npm:1.1.2" = { filename = "function-bind-npm-1.1.2-7a55be9b03-d8680ee1e5.zip"; sha512 = "d8680ee1e5fcd4c197e4ac33b2b4dce03c71f4d91717292785703db200f5c21f977c568d28061226f9b5900cbcd2c84463646134fd5337e7925e0942bc3f46d5"; };
-"gauge@npm:3.0.2" = { filename = "gauge-npm-3.0.2-9e22f7af9e-75230ccaf2.zip"; sha512 = "75230ccaf216471e31025c7d5fcea1629596ca20792de50c596eb18ffb14d8404f927cd55535aab2eeecd18d1e11bd6f23ec3c2e9878d2dda1dc74bccc34b913"; };
-"get-caller-file@npm:2.0.5" = { filename = "get-caller-file-npm-2.0.5-80e8a86305-c6c7b60271.zip"; sha512 = "c6c7b60271931fa752aeb92f2b47e355eac1af3a2673f47c9589e8f8a41adc74d45551c1bc57b5e66a80609f10ffb72b6f575e4370d61cc3f7f3aaff01757cde"; };
-"get-func-name@npm:2.0.2" = { filename = "get-func-name-npm-2.0.2-409dbe3703-89830fd076.zip"; sha512 = "89830fd07623fa73429a711b9daecdb304386d237c71268007f788f113505ef1d4cc2d0b9680e072c5082490aec9df5d7758bf5ac6f1c37062855e8e3dc0b9df"; };
-"get-intrinsic@npm:1.2.2" = { filename = "get-intrinsic-npm-1.2.2-3f446d8847-4e7fb8adc6.zip"; sha512 = "4e7fb8adc6172bae7c4fe579569b4d5238b3667c07931cd46b4eee74bbe6ff6b91329bec311a638d8e60f5b51f44fe5445693c6be89ae88d4b5c49f7ff12db0b"; };
-"glob-parent@npm:5.1.2" = { filename = "glob-parent-npm-5.1.2-021ab32634-cab87638e2.zip"; sha512 = "cab87638e2112bee3f839ef5f6e0765057163d39c66be8ec1602f3823da4692297ad4e972de876ea17c44d652978638d2fd583c6713d0eb6591706825020c9ee"; };
-"glob@npm:10.3.10" = { filename = "glob-npm-10.3.10-da1ef8b112-13d8a1feb7.zip"; sha512 = "13d8a1feb7eac7945f8c8480e11cd4a44b24d26503d99a8d8ac8d5aefbf3e9802a2b6087318a829fad04cb4e829f25c5f4f1110c68966c498720dd261c7e344d"; };
-"glob@npm:7.2.0" = { filename = "glob-npm-7.2.0-bb4644d239-478b40e38b.zip"; sha512 = "478b40e38be5a3d514e64950e1e07e0ac120585add6a37c98d0ed24d72d9127d734d2a125786073c8deb687096e84ae82b641c441a869ada3a9cc91b68978632"; };
-"glob@npm:7.2.3" = { filename = "glob-npm-7.2.3-2d866d17a5-65676153e2.zip"; sha512 = "65676153e2b0c9095100fe7f25a778bf45608eeb32c6048cf307f579649bcc30353277b3b898a3792602c65764e5baa4f643714dfbdfd64ea271d210c7a425fe"; };
-"gopd@npm:1.0.1" = { filename = "gopd-npm-1.0.1-10c1d0b534-505c05487f.zip"; sha512 = "505c05487f7944c552cee72087bf1567debb470d4355b1335f2c262d218ebbff805cd3715448fe29b4b380bae6912561d0467233e4165830efd28da241418c63"; };
-"graceful-fs@npm:4.2.11" = { filename = "graceful-fs-npm-4.2.11-24bb648a68-386d011a55.zip"; sha512 = "386d011a553e02bc594ac2ca0bd6d9e4c22d7fa8cfbfc448a6d148c59ea881b092db9dbe3547ae4b88e55f1b01f7c4a2ecc53b310c042793e63aa44cf6c257f2"; };
-"has-flag@npm:4.0.0" = { filename = "has-flag-npm-4.0.0-32af9f0536-2e789c61b7.zip"; sha512 = "2e789c61b7888d66993e14e8331449e525ef42aac53c627cc53d1c3334e768bcb6abdc4f5f0de1478a25beec6f0bd62c7549058b7ac53e924040d4f301f02fd1"; };
-"has-property-descriptors@npm:1.0.1" = { filename = "has-property-descriptors-npm-1.0.1-61cd62fce3-d62ba94b40.zip"; sha512 = "d62ba94b40150b00d621bc64a6aedb5bf0ee495308b4b7ed6bac856043db3cdfb1db553ae81cec91c9d2bd82057ff0e94145e7fa25d5aa5985ed32e0921927f6"; };
-"has-proto@npm:1.0.1" = { filename = "has-proto-npm-1.0.1-631ea9d820-c8a8fe411f.zip"; sha512 = "c8a8fe411f810b23a564bd5546a8f3f0fff6f1b692740eb7a2fdc9df716ef870040806891e2f23ff4653f1083e3895bf12088703dd1a0eac3d9202d3a4768cd0"; };
-"has-symbols@npm:1.0.3" = { filename = "has-symbols-npm-1.0.3-1986bff2c4-e6922b4345.zip"; sha512 = "e6922b4345a3f37069cdfe8600febbca791c94988c01af3394d86ca3360b4b93928bbf395859158f88099cb10b19d98e3bbab7c9ff2c1bd09cf665ee90afa2c3"; };
-"has-tostringtag@npm:1.0.0" = { filename = "has-tostringtag-npm-1.0.0-b1fcf3ab55-1cdba76b7d.zip"; sha512 = "1cdba76b7d13f65198a92b8ca1560ba40edfa09e85d182bf436d928f3588a9ebd260451d569f0ed1b849c4bf54f49c862aa0d0a77f9552b1855bb6deb526c011"; };
-"has-unicode@npm:2.0.1" = { filename = "has-unicode-npm-2.0.1-893adb4747-ebdb2f4895.zip"; sha512 = "ebdb2f4895c26bb08a8a100b62d362e49b2190bcfd84b76bc4be1a3bd4d254ec52d0dd9f2fbcc093fc5eb878b20c52146f9dfd33e2686ed28982187be593b47c"; };
-"hasown@npm:2.0.0" = { filename = "hasown-npm-2.0.0-78b794ceef-5d415b114f.zip"; sha512 = "5d415b114f410661208c95e7ab4879f1cc2765b8daceff4dc8718317d1cb7b9ffa7c5d1eafd9a4389c9aab7445d6ea88e05f3096cb1e529618b55304956b87fc"; };
-"he@npm:1.2.0" = { filename = "he-npm-1.2.0-3b73a2ff07-a27d478bef.zip"; sha512 = "a27d478befe3c8192f006cdd0639a66798979dfa6e2125c6ac582a19a5ebfec62ad83e8382e6036170d873f46e4536a7e795bf8b95bf7c247f4cc0825ccc8c17"; };
-"http-assert@npm:1.5.0" = { filename = "http-assert-npm-1.5.0-bf7ea4ffcf-7b4e631114.zip"; sha512 = "7b4e631114a1a77654f9ba3feb96da305ddbdeb42112fe384b7b3249c7141e460d7177970155bea6e54e655a04850415b744b452c1fe5052eba6f4186d16b095"; };
-"http-cache-semantics@npm:4.1.1" = { filename = "http-cache-semantics-npm-4.1.1-1120131375-ce1319b8a3.zip"; sha512 = "ce1319b8a382eb3cbb4a37c19f6bfe14e5bb5be3d09079e885e8c513ab2d3cd9214902f8a31c9dc4e37022633ceabfc2d697405deeaf1b8f3552bb4ed996fdfc"; };
-"http-errors@npm:1.8.1" = { filename = "http-errors-npm-1.8.1-fb60d9f6ae-f01aeecd76.zip"; sha512 = "f01aeecd76260a6fe7f08e192fcbe9b2f39ed20fc717b852669a69930167053b01790998275c6297d44f435cf0e30edd50c05223d1bec9bc484e6cf35b2d6f43"; };
-"http-errors@npm:2.0.0" = { filename = "http-errors-npm-2.0.0-3f1c503428-fc6f2715fe.zip"; sha512 = "fc6f2715fe188d091274b5ffc8b3657bd85c63e969daa68ccb77afb05b071a4b62841acb7a21e417b5539014dff2ebf9550f0b14a9ff126f2734a7c1387f8e19"; };
-"http-proxy-agent@npm:7.0.0" = { filename = "http-proxy-agent-npm-7.0.0-106a57cc8c-a11574ff39.zip"; sha512 = "a11574ff39436cee3c7bc67f259444097b09474605846ddd8edf0bf4ad8644be8533db1aa463426e376865047d05dc22755e638632819317c0c2f1b2196657c8"; };
-"https-proxy-agent@npm:5.0.1" = { filename = "https-proxy-agent-npm-5.0.1-42d65f358e-6dd639f034.zip"; sha512 = "6dd639f03434003577c62b27cafdb864784ef19b2de430d8ae2a1d45e31c4fd60719e5637b44db1a88a046934307da7089e03d6089ec3ddacc1189d8de8897d1"; };
-"https-proxy-agent@npm:7.0.2" = { filename = "https-proxy-agent-npm-7.0.2-83ea6a5d42-7735eb9007.zip"; sha512 = "7735eb90073db087e7e79312e3d97c8c04baf7ea7ca7b013382b6a45abbaa61b281041a98f4e13c8c80d88f843785bcc84ba189165b4b4087b1e3496ba656d77"; };
-"iconv-lite@npm:0.4.24" = { filename = "iconv-lite-npm-0.4.24-c5c4ac6695-c6886a24cc.zip"; sha512 = "c6886a24cc00f2a059767440ec1bc00d334a89f250db8e0f7feb4961c8727118457e27c495ba94d082e51d3baca378726cd110aaf7ded8b9bbfd6a44760cf1d4"; };
-"iconv-lite@npm:0.6.3" = { filename = "iconv-lite-npm-0.6.3-24b8aae27e-98102bc66b.zip"; sha512 = "98102bc66b33fcf5ac044099d1257ba0b7ad5e3ccd3221f34dd508ab4070edff183276221684e1e0555b145fce0850c9f7d2b60a9fcac50fbb4ea0d6e845a3b1"; };
-"imurmurhash@npm:0.1.4" = { filename = "imurmurhash-npm-0.1.4-610c5068a0-8b51313850.zip"; sha512 = "8b51313850dd33605c6c9d3fd9638b714f4c4c40250cff658209f30d40da60f78992fb2df5dabee4acf589a6a82bbc79ad5486550754bd9ec4e3fc0d4a57d6a6"; };
-"indent-string@npm:4.0.0" = { filename = "indent-string-npm-4.0.0-7b717435b2-1e1904ddb0.zip"; sha512 = "1e1904ddb0cb3d6cce7cd09e27a90184908b7a5d5c21b92e232c93579d314f0b83c246ffb035493d0504b1e9147ba2c9b21df0030f48673fba0496ecd698161f"; };
-"inflation@npm:2.1.0" = { filename = "inflation-npm-2.1.0-df5ba7218d-aadfcb8047.zip"; sha512 = "aadfcb8047a7e00d644e2e195f901dd9d7266c2be2326b7f8f6a99298f14916f1e322d00108a7e2778d6e76a8dc2174ddb9ac14bcdfe4f4866dfd612b695ab5d"; };
-"inflight@npm:1.0.6" = { filename = "inflight-npm-1.0.6-ccedb4b908-7faca22584.zip"; sha512 = "7faca22584600a9dc5b9fca2cd5feb7135ac8c935449837b315676b4c90aa4f391ec4f42240178244b5a34e8bede1948627fda392ca3191522fc46b34e985ab2"; };
-"inherits@npm:2.0.4" = { filename = "inherits-npm-2.0.4-c66b3957a0-4e531f648b.zip"; sha512 = "4e531f648b29039fb7426fb94075e6545faa1eb9fe83c29f0b6d9e7263aceb4289d2d4557db0d428188eeb449cc7c5e77b0a0b2c4e248ff2a65933a0dee49ef2"; };
-"ip@npm:2.0.0" = { filename = "ip-npm-2.0.0-204facb3cc-8d186cc558.zip"; sha512 = "8d186cc5585f57372847ae29b6eba258c68862055e18a75cc4933327232cb5c107f89800ce29715d542eef2c254fbb68b382e780a7414f9ee7caf60b7a473958"; };
-"is-binary-path@npm:2.1.0" = { filename = "is-binary-path-npm-2.1.0-e61d46f557-a16eaee59a.zip"; sha512 = "a16eaee59ae2b315ba36fad5c5dcaf8e49c3e27318f8ab8fa3cdb8772bf559c8d1ba750a589c2ccb096113bb64497084361a25960899cb6172a6925ab6123d38"; };
-"is-extglob@npm:2.1.1" = { filename = "is-extglob-npm-2.1.1-0870ea68b5-5487da3569.zip"; sha512 = "5487da35691fbc339700bbb2730430b07777a3c21b9ebaecb3072512dfd7b4ba78ac2381a87e8d78d20ea08affb3f1971b4af629173a6bf435ff8a4c47747912"; };
-"is-fullwidth-code-point@npm:3.0.0" = { filename = "is-fullwidth-code-point-npm-3.0.0-1ecf4ebee5-bb11d825e0.zip"; sha512 = "bb11d825e049f38e04c06373a8d72782eee0205bda9d908cc550ccb3c59b99d750ff9537982e01733c1c94a58e35400661f57042158ff5e8f3e90cf936daf0fc"; };
-"is-generator-function@npm:1.0.10" = { filename = "is-generator-function-npm-1.0.10-1d0f3809ef-df03514df0.zip"; sha512 = "df03514df01a6098945b5a0cfa1abff715807c8e72f57c49a0686ad54b3b74d394e2d8714e6f709a71eb00c9630d48e73ca1796c1ccc84ac95092c1fecc0d98b"; };
-"is-glob@npm:4.0.3" = { filename = "is-glob-npm-4.0.3-cb87bf1bdb-17fb4014e2.zip"; sha512 = "17fb4014e22be3bbecea9b2e3a76e9e34ff645466be702f1693e8f1ee1adac84710d0be0bd9f967d6354036fd51ab7c2741d954d6e91dae6bb69714de92c197a"; };
-"is-lambda@npm:1.0.1" = { filename = "is-lambda-npm-1.0.1-7ab55bc8a8-85fee098ae.zip"; sha512 = "85fee098ae62ba6f1e24cf22678805473c7afd0fb3978a3aa260e354cb7bcb3a5806cf0a98403188465efedec41ab4348e8e4e79305d409601323855b3839d4d"; };
-"is-number@npm:7.0.0" = { filename = "is-number-npm-7.0.0-060086935c-b4686d0d30.zip"; sha512 = "b4686d0d3053146095ccd45346461bc8e53b80aeb7671cc52a4de02dbbf7dc0d1d2a986e2fe4ae206984b4d34ef37e8b795ebc4f4295c978373e6575e295d811"; };
-"is-plain-obj@npm:2.1.0" = { filename = "is-plain-obj-npm-2.1.0-8dffd7ae9c-e5c9814cda.zip"; sha512 = "e5c9814cdaa627a9ad0a0964ded0e0491bfd9ace405c49a5d63c88b30a162f1512c069d5b80997893c4d0181eadc3fed02b4ab4b81059aba5620bfcdfdeb9c53"; };
-"is-unicode-supported@npm:0.1.0" = { filename = "is-unicode-supported-npm-0.1.0-0833e1bbfb-00cbe3455c.zip"; sha512 = "00cbe3455c3756be68d2542c416cab888aebd5012781d6819749fefb15162ff23e38501fe681b3d751c73e8ff561ac09a5293eba6f58fdf0178462ce6dcb3453"; };
-"isexe@npm:2.0.0" = { filename = "isexe-npm-2.0.0-b58870bd2e-228cfa503f.zip"; sha512 = "228cfa503fadc2c31596ab06ed6aa82c9976eec2bfd83397e7eaf06d0ccf42cd1dfd6743bf9aeb01aebd4156d009994c5f76ea898d2832c1fe342da923ca457d"; };
-"isexe@npm:3.1.1" = { filename = "isexe-npm-3.1.1-9c0061eead-9ec2576540.zip"; sha512 = "9ec257654093443eb0a528a9c8cbba9c0ca7616ccb40abd6dde7202734d96bb86e4ac0d764f0f8cd965856aacbff2f4ce23e730dc19dfb41e3b0d865ca6fdcc7"; };
-"jackspeak@npm:2.3.6" = { filename = "jackspeak-npm-2.3.6-42e1233172-f01d8f972d.zip"; sha512 = "f01d8f972d894cd7638bc338e9ef5ddb86f7b208ce177a36d718eac96ec86638a6efa17d0221b10073e64b45edc2ce15340db9380b1f5d5c5d000cbc517dc111"; };
-"jake@npm:10.8.7" = { filename = "jake-npm-10.8.7-1caf9b4534-89326d01a8.zip"; sha512 = "89326d01a8bc110d02d973729a66394c79a34b34461116f5c530a2a2dbc30265683fe6737928f75df9178e9d369ff1442f5753fb983d525e740eefdadc56a103"; };
-"js-yaml@npm:4.1.0" = { filename = "js-yaml-npm-4.1.0-3606f32312-184a24b4ea.zip"; sha512 = "184a24b4eaacfce40ad9074c64fd42ac83cf74d8c8cd137718d456ced75051229e5061b8633c3366b8aada17945a7a356b337828c19da92b51ae62126575018f"; };
-"jsonld@npm:8.3.1" = { filename = "jsonld-npm-8.3.1-bf59612cf1-2da518515c.zip"; sha512 = "2da518515c3018fd6218334713bf28c1195ea9a27ea54ef12560941141cc925501a8a83e1eeb7c43c122e6cade61bbcb2c0121fad145044b713e086ad7f50722"; };
-"keygrip@npm:1.1.0" = { filename = "keygrip-npm-1.1.0-8da030c3ff-2aceec1a1e.zip"; sha512 = "2aceec1a1e642a0caf938044056ed67b1909cfe67a93a59b32aae2863e0f35a1a53782ecc8f9cd0e3bdb60863fa0f401ccbd257cd7dfae61915f78445139edea"; };
-"koa-compose@npm:4.1.0" = { filename = "koa-compose-npm-4.1.0-b682d9324e-f1f786f994.zip"; sha512 = "f1f786f994a691931148e7f38f443865bf2702af4a61610d1eea04dab79c04b1232285b59d82a0cf61c830516dd92f10ab0d009b024fcecd4098e7d296ab771a"; };
-"koa-convert@npm:2.0.0" = { filename = "koa-convert-npm-2.0.0-d709eca55c-d3e243cecc.zip"; sha512 = "d3e243ceccd11524d5f4942f6ccd828a9b18a1a967c4375192aa9eedf844f790563632839f006732ce8ca720275737c65a3bab344e13b25f41fb2be451ea102c"; };
-"koa@npm:2.14.2" = { filename = "koa-npm-2.14.2-0908395b5d-f60ae84974.zip"; sha512 = "f60ae84974d7cb834a5937592e010d97134278527a55a3a38973935db9ea409fecbd824e5ff0fa767077d9a9dc1f1a32881b626ddaad8b5978756c345f520cdd"; };
-"ky-universal@npm:0.11.0" = { filename = "ky-universal-npm-0.11.0-f343804243-d71a1cae6d.zip"; sha512 = "d71a1cae6d79c93808eda3b021eea91df064ac972f0391b45aa0913cdc48bdcad9c33452d68de021bd32c1b5abe15090229ae4a45fa28f7babb8e77e39ae1596"; };
-"ky@npm:0.33.3" = { filename = "ky-npm-0.33.3-7d1cbfa9f4-5ba8de4c97.zip"; sha512 = "5ba8de4c97c2abe5fb1b7d1b20252f95a7b249254af03cdfac670b9615de6b2b4af747bf363a1b918d2650c4cc83259578105f8eadd284f4e1c4261081e29640"; };
-"leven@npm:4.0.0" = { filename = "leven-npm-4.0.0-7caa3158fb-393bd949d9.zip"; sha512 = "393bd949d93103d9ef487be96321bdb02c2e7695e372193f650642e1ad653c61b03da16bf55e45d442db59c7b6407eb947a7748b5777e48ddf0ada25f8b2a815"; };
-"locate-path@npm:6.0.0" = { filename = "locate-path-npm-6.0.0-06a1e4c528-d3972ab70d.zip"; sha512 = "d3972ab70dfe58ce620e64265f90162d247e87159b6126b01314dd67be43d50e96a50b517bce2d9452a79409c7614054c277b5232377de50416564a77ac7aad3"; };
-"log-symbols@npm:4.1.0" = { filename = "log-symbols-npm-4.1.0-0a13492d8b-67f445a9ff.zip"; sha512 = "67f445a9ffa76db1989d0fa98586e5bc2fd5247260dafb8ad93d9f0ccd5896d53fb830b0e54dade5ad838b9de2006c826831a3c528913093af20dff8bd24aca6"; };
-"loupe@npm:2.3.7" = { filename = "loupe-npm-2.3.7-f294c2ef33-71a781c8fc.zip"; sha512 = "71a781c8fc21527b99ed1062043f1f2bb30bdaf54fa4cf92463427e1718bc6567af2988300bc243c1f276e4f0876f29e3cbf7b58106fdc186915687456ce5bf4"; };
-"lru-cache@npm:10.1.0" = { filename = "lru-cache-npm-10.1.0-f3d3a0f0ab-778bc8b262.zip"; sha512 = "778bc8b2626daccd75f24c4b4d10632496e21ba064b126f526c626fbdbc5b28c472013fccd45d7646b9e1ef052444824854aed617b59cd570d01a8b7d651fc1e"; };
-"lru-cache@npm:6.0.0" = { filename = "lru-cache-npm-6.0.0-b4c8668fe1-cb53e58278.zip"; sha512 = "cb53e582785c48187d7a188d3379c181b5ca2a9c78d2bce3e7dee36f32761d1c42983da3fe12b55cb74e1779fa94cdc2e5367c028a9b35317184ede0c07a30a9"; };
-"make-dir@npm:3.1.0" = { filename = "make-dir-npm-3.1.0-d1d7505142-56aaafefc4.zip"; sha512 = "56aaafefc49c2dfef02c5c95f9b196c4eb6988040cf2c712185c7fe5c99b4091591a7fc4d4eafaaefa70ff763a26f6ab8c3ff60b9e75ea19876f49b18667ecaa"; };
-"make-fetch-happen@npm:13.0.0" = { filename = "make-fetch-happen-npm-13.0.0-f87a92bb87-43b9f6dcbc.zip"; sha512 = "43b9f6dcbc6fe8b8604cb6396957c3698857a15ba4dbc38284f7f0e61f248300585ef1eb8cc62df54e9c724af977e45b5cdfd88320ef7f53e45070ed3488da55"; };
-"media-typer@npm:0.3.0" = { filename = "media-typer-npm-0.3.0-8674f8f0f5-d160f31246.zip"; sha512 = "d160f31246907e79fed398470285f21bafb45a62869dc469b1c8877f3f064f5eabc4bcc122f9479b8b605bc5c76187d7871cf84c4ee3ecd3e487da1993279928"; };
-"methods@npm:1.1.2" = { filename = "methods-npm-1.1.2-92f6fdb39b-bdf7cc72ff.zip"; sha512 = "bdf7cc72ff0a33e3eede03708c08983c4d7a173f91348b4b1e4f47d4cdbf734433ad971e7d1e8c77247d9e5cd8adb81ea4c67b0a2db526b758b2233d7814b8b2"; };
-"mime-db@npm:1.52.0" = { filename = "mime-db-npm-1.52.0-b5371d6fd2-0557a01dee.zip"; sha512 = "0557a01deebf45ac5f5777fe7740b2a5c309c6d62d40ceab4e23da9f821899ce7a900b7ac8157d4548ddbb7beffe9abc621250e6d182b0397ec7f10c7b91a5aa"; };
-"mime-types@npm:2.1.35" = { filename = "mime-types-npm-2.1.35-dd9ea9f3e2-82fb07ec56.zip"; sha512 = "82fb07ec56d8ff1fc999a84f2f217aa46cb6ed1033fefaabd5785b9a974ed225c90dc72fff460259e66b95b73648596dbcc50d51ed69cdf464af2d237d3149b2"; };
-"mimic-response@npm:2.1.0" = { filename = "mimic-response-npm-2.1.0-037463e454-717475c840.zip"; sha512 = "717475c840f20deca87a16cb2f7561f9115f5de225ea2377739e09890c81aec72f43c81fd4984650c4044e66be5a846fa7a517ac7908f01009e1e624e19864d5"; };
-"minimatch@npm:3.1.2" = { filename = "minimatch-npm-3.1.2-9405269906-0262810a8f.zip"; sha512 = "0262810a8fc2e72cca45d6fd86bd349eee435eb95ac6aa45c9ea2180e7ee875ef44c32b55b5973ceabe95ea12682f6e3725cbb63d7a2d1da3ae1163c8b210311"; };
-"minimatch@npm:5.0.1" = { filename = "minimatch-npm-5.0.1-612724f6f0-baa60fc583.zip"; sha512 = "baa60fc5839205f13d6c266d8ad4d160ae37c33f66b130b5640acac66deff84b934ac6307f5dc5e4b30362c51284817c12df7c9746ffb600b9009c581e0b1634"; };
-"minimatch@npm:5.1.6" = { filename = "minimatch-npm-5.1.6-1e71429f4c-3defdfd230.zip"; sha512 = "3defdfd230914f22a8da203747c42ee3c405c39d4d37ffda284dac5e45b7e1f6c49aa8be606509002898e73091ff2a3bbfc59c2c6c71d4660609f63aa92f98e3"; };
-"minimatch@npm:9.0.3" = { filename = "minimatch-npm-9.0.3-69d7d6fad5-85f407dcd3.zip"; sha512 = "85f407dcd38ac3e180f425e86553911d101455ca3ad5544d6a7cec16286657e4f8a9aa6695803025c55e31e35a91a2252b5dc8e7d527211278b8b65b4dbd5eac"; };
-"minipass-collect@npm:1.0.2" = { filename = "minipass-collect-npm-1.0.2-3b4676eab5-8f82bd1f30.zip"; sha512 = "8f82bd1f3095b24f53a991b04b67f4c710c894e518b813f0864a31de5570441a509be1ca17e0bb92b047591a8fdbeb886f502764fefb00d2f144f4011791e898"; };
-"minipass-fetch@npm:3.0.4" = { filename = "minipass-fetch-npm-3.0.4-200ac7c66d-1b63c1f331.zip"; sha512 = "1b63c1f3313e88eeac4689f1b71c9f086598db9a189400e3ee960c32ed89e06737fa23976c9305c2d57464fb3fcdc12749d3378805c9d6176f5569b0d0ee8a75"; };
-"minipass-flush@npm:1.0.5" = { filename = "minipass-flush-npm-1.0.5-efe79d9826-2a51b63feb.zip"; sha512 = "2a51b63feb799d2bb34669205eee7c0eaf9dce01883261a5b77410c9408aa447e478efd191b4de6fc1101e796ff5892f8443ef20d9544385819093dbb32d36bd"; };
-"minipass-pipeline@npm:1.2.4" = { filename = "minipass-pipeline-npm-1.2.4-5924cb077f-cbda57cea2.zip"; sha512 = "cbda57cea20b140b797505dc2cac71581a70b3247b84480c1fed5ca5ba46c25ecc25f68bfc9e6dcb1a6e9017dab5c7ada5eab73ad4f0a49d84e35093e0c643f2"; };
-"minipass-sized@npm:1.0.3" = { filename = "minipass-sized-npm-1.0.3-306d86f432-298f124753.zip"; sha512 = "298f124753efdc745cfe0f2bdfdd81ba25b9f4e753ca4a2066eb17c821f25d48acea607dfc997633ee5bf7b6dfffb4eee4f2051eb168663f0b99fad2fa4829cb"; };
-"minipass@npm:3.3.6" = { filename = "minipass-npm-3.3.6-b8d93a945b-a114746943.zip"; sha512 = "a114746943afa1dbbca8249e706d1d38b85ed1298b530f5808ce51f8e9e941962e2a5ad2e00eae7dd21d8a4aae6586a66d4216d1a259385e9d0358f0c1eba16c"; };
-"minipass@npm:5.0.0" = { filename = "minipass-npm-5.0.0-c64fb63c92-a91d8043f6.zip"; sha512 = "a91d8043f691796a8ac88df039da19933ef0f633e3d7f0d35dcd5373af49131cf2399bfc355f41515dc495e3990369c3858cd319e5c2722b4753c90bf3152462"; };
-"minipass@npm:7.0.4" = { filename = "minipass-npm-7.0.4-eacb4e042e-6c7370a6df.zip"; sha512 = "6c7370a6dfd257bf18222da581ba89a5eaedca10e158781232a8b5542a90547540b4b9b7e7f490e4cda43acfbd12e086f0453728ecf8c19e0ef6921bc5958ac5"; };
-"minizlib@npm:2.1.2" = { filename = "minizlib-npm-2.1.2-ea89cd0cfb-64fae024e1.zip"; sha512 = "64fae024e1a7d0346a1102bb670085b17b7f95bf6cfdf5b128772ec8faf9ea211464ea4add406a3a6384a7d87a0cd1a96263692134323477b4fb43659a6cab78"; };
-"mkdirp@npm:1.0.4" = { filename = "mkdirp-npm-1.0.4-37f6ef56b9-46ea0f3ffa.zip"; sha512 = "46ea0f3ffa8bc6a5bc0c7081ffc3907777f0ed6516888d40a518c5111f8366d97d2678911ad1a6882bf592fa9de6c784fea32e1687bb94e1f4944170af48a5cf"; };
-"mocha@npm:10.2.0" = { filename = "mocha-npm-10.2.0-87db25c7c5-1451854355.zip"; sha512 = "145185435535ec7766932e9fa3def1520ffb895e7fa341e8592829844c4c9dd9fcb35db139d448c228b5ad3c2bedce50423ce760827b3054fafe6d47ef014937"; };
-"ms@npm:2.1.2" = { filename = "ms-npm-2.1.2-ec0c1512ff-a437714e2f.zip"; sha512 = "a437714e2f90dbf881b5191d35a6db792efbca5badf112f87b9e1c712aace4b4b9b742dd6537f3edf90fd6f684de897cec230abde57e87883766712ddda297cc"; };
-"ms@npm:2.1.3" = { filename = "ms-npm-2.1.3-81ff3cfac1-d924b57e73.zip"; sha512 = "d924b57e7312b3b63ad21fc5b3dc0af5e78d61a1fc7cfb5457edaf26326bf62be5307cc87ffb6862ef1c2b33b0233cdb5d4f01c4c958cc0d660948b65a287a48"; };
-"nan@npm:2.18.0" = { filename = "nan-npm-2.18.0-a51ed5bed5-9209d80134.zip"; sha512 = "9209d80134fdb98c0afe35c1372d2b930a0a8d3c52706cb5e4257a27e9845c375f7a8daedadadec8d6403ca2eebb3b37d362ff5d1ec03249462abf65fef2a148"; };
-"nanoid@npm:3.3.3" = { filename = "nanoid-npm-3.3.3-25d865be84-d7ab68893c.zip"; sha512 = "d7ab68893cdb92dd2152d505e56571d571c65b71a9815f9dfb3c9a8cbf943fe43c9777d9a95a3b81ef01e442fec8409a84375c08f90a5753610a9f22672d953a"; };
-"negotiator@npm:0.6.3" = { filename = "negotiator-npm-0.6.3-9d50e36171-3ec9fd413e.zip"; sha512 = "3ec9fd413e7bf071c937ae60d572bc67155262068ed522cf4b3be5edbe6ddf67d095ec03a3a14ebf8fc8e95f8e1d61be4869db0dbb0de696f6b837358bd43fc2"; };
-"node-domexception@npm:1.0.0" = { filename = "node-domexception-npm-1.0.0-e1e813b76f-5e5d63cda2.zip"; sha512 = "5e5d63cda29856402df9472335af4bb13875e1927ad3be861dc5ebde38917aecbf9ae337923777af52a48c426b70148815e890a5d72760f1b4d758cc671b1a2b"; };
-"node-fetch@npm:2.7.0" = { filename = "node-fetch-npm-2.7.0-587d57004e-b55786b602.zip"; sha512 = "b55786b6028208e6fbe594ccccc213cab67a72899c9234eb59dba51062a299ea853210fcf526998eaa2867b0963ad72338824450905679ff0fa304b8c5093ae8"; };
-"node-fetch@npm:3.3.2" = { filename = "node-fetch-npm-3.3.2-5267e015f2-f3d5e56190.zip"; sha512 = "f3d5e56190562221398c9f5750198b34cf6113aa304e34ee97c94fd300ec578b25b2c2906edba922050fce983338fde0d5d34fcb0fc3336ade5bd0e429ad7538"; };
-"node-gyp@npm:10.0.1" = { filename = "node-gyp-npm-10.0.1-48708ce70b-abddfff7d8.zip"; sha512 = "abddfff7d873312e4ed4a5fb75ce893a5c4fb69e7fcb1dfa71c28a6b92a7f1ef6b62790dffb39181b5a82728ba8f2f32d229cf8cbe66769fe02cea7db4a555aa"; };
-"nopt@npm:5.0.0" = { filename = "nopt-npm-5.0.0-304b40fbfe-fc5c4f0715.zip"; sha512 = "fc5c4f07155cb455bf5fc3dd149fac421c1a40fd83c6bfe83aa82b52f02c17c5e88301321318adaa27611c8a6811423d51d29deaceab5fa158b585a61a551061"; };
-"nopt@npm:7.2.0" = { filename = "nopt-npm-7.2.0-dd734b678d-9bd7198df6.zip"; sha512 = "9bd7198df6f16eb29ff16892c77bcf7f0cc41f9fb5c26280ac0def2cf8cf319f3b821b3af83eba0e74c85807cc430a16efe0db58fe6ae1f41e69519f585b6aff"; };
-"normalize-path@npm:3.0.0" = { filename = "normalize-path-npm-3.0.0-658ba7d77f-e008c8142b.zip"; sha512 = "e008c8142bcc335b5e38cf0d63cfd39d6cf2d97480af9abdbe9a439221fd4d749763bab492a8ee708ce7a194bb00c9da6d0a115018672310850489137b3da046"; };
-"npmlog@npm:5.0.1" = { filename = "npmlog-npm-5.0.1-366cab64a2-489ba51903.zip"; sha512 = "489ba519031013001135c463406f55491a17fc7da295c18a04937fe3a4d523fd65e88dd418a28b967ab743d913fdeba1e29838ce0ad8c75557057c481f7d49fa"; };
-"object-assign@npm:4.1.1" = { filename = "object-assign-npm-4.1.1-1004ad6dec-1f4df99451.zip"; sha512 = "1f4df9945120325d041ccf7b86f31e8bcc14e73d29171e37a7903050e96b81323784ec59f93f102ec635bcf6fa8034ba3ea0a8c7e69fa202b87ae3b6cec5a414"; };
-"object-inspect@npm:1.13.1" = { filename = "object-inspect-npm-1.13.1-fd038a2f0a-fad603f408.zip"; sha512 = "fad603f408e345c82e946abdf4bfd774260a5ed3e5997a0b057c44153ac32c7271ff19e3a5ae39c858da683ba045ccac2f65245c12763ce4e8594f818f4a648d"; };
-"obuf@npm:1.1.2" = { filename = "obuf-npm-1.1.2-8db5fae8dd-520aaac7ea.zip"; sha512 = "520aaac7ea701618eacf000fc96ae458e20e13b0569845800fc582f81b386731ab22d55354b4915d58171db00e79cfcd09c1638c02f89577ef092b38c65b7d81"; };
-"on-finished@npm:2.4.1" = { filename = "on-finished-npm-2.4.1-907af70f88-46fb11b906.zip"; sha512 = "46fb11b9063782f2d9968863d9cbba33d77aa13c17f895f56129c274318b86500b22af3a160fe9995aa41317efcd22941b6eba747f718ced08d9a73afdb087b4"; };
-"once@npm:1.4.0" = { filename = "once-npm-1.4.0-ccf03ef07a-5d48aca287.zip"; sha512 = "5d48aca287dfefabd756621c5dfce5c91a549a93e9fdb7b8246bc4c4790aa2ec17b34a260530474635147aeb631a2dcc8b32c613df0675f96041cbb8244517d0"; };
-"only@npm:0.0.2" = { filename = "only-npm-0.0.2-122402a3f9-d26b134783.zip"; sha512 = "d26b1347835a5a9b17afbd889ed60de3d3ae14cdeca5ba008d86e6bf055466a431adc731b82e1e8ab24a3b8be5b5c2cdbc16e652d231d18cc1a5752320aaf0a0"; };
-"p-limit@npm:3.1.0" = { filename = "p-limit-npm-3.1.0-05d2ede37f-9db675949d.zip"; sha512 = "9db675949dbdc9c3763c89e748d0ef8bdad0afbb24d49ceaf4c46c02c77d30db4e0652ed36d0a0a7a95154335fab810d95c86153105bb73b3a90448e2bb14e1a"; };
-"p-locate@npm:5.0.0" = { filename = "p-locate-npm-5.0.0-92cc7c7a3e-2290d627ab.zip"; sha512 = "2290d627ab7903b8b70d11d384fee714b797f6040d9278932754a6860845c4d3190603a0772a663c8cb5a7b21d1b16acb3a6487ebcafa9773094edc3dfe6009a"; };
-"p-map@npm:4.0.0" = { filename = "p-map-npm-4.0.0-4677ae07c7-592c05bd62.zip"; sha512 = "592c05bd6262c466ce269ff172bb8de7c6975afca9b50c975135b974e9bdaafbfe80e61aaaf5be6d1200ba08b30ead04b88cfa7e25ff1e3b93ab28c9f62a2c75"; };
-"packet-reader@npm:1.0.0" = { filename = "packet-reader-npm-1.0.0-e93c92246b-c86c3321bb.zip"; sha512 = "c86c3321bb07e0f03cc2db59f7701184e0bbfcb914f1fdc963993b03262486deb402292adcef39b64e3530ea66b3b2e2163d6da7b3792a730bdd1c6df3175aaa"; };
-"parse5@npm:7.1.2" = { filename = "parse5-npm-7.1.2-aa9a92c270-297d7af822.zip"; sha512 = "297d7af8224f4b5cb7f6617ecdae98eeaed7f8cbd78956c42785e230505d5a4f07cef352af10d3006fa5c1544b76b57784d3a22d861ae071bbc460c649482bf4"; };
-"parseurl@npm:1.3.3" = { filename = "parseurl-npm-1.3.3-1542397e00-90dd4760d6.zip"; sha512 = "90dd4760d6f6174adb9f20cf0965ae12e23879b5f5464f38e92fce8073354341e4b3b76fa3d878351efe7d01e617121955284cfd002ab087fba1a0726ec0b4f5"; };
-"path-exists@npm:4.0.0" = { filename = "path-exists-npm-4.0.0-e9e4f63eb0-8c0bd3f523.zip"; sha512 = "8c0bd3f5238188197dc78dced15207a4716c51cc4e3624c44fc97acf69558f5ebb9a2afff486fe1b4ee148e0c133e96c5e11a9aa5c48a3006e3467da070e5e1b"; };
-"path-is-absolute@npm:1.0.1" = { filename = "path-is-absolute-npm-1.0.1-31bc695ffd-127da03c82.zip"; sha512 = "127da03c82172a2a50099cddbf02510c1791fc2cc5f7713ddb613a56838db1e8168b121a920079d052e0936c23005562059756d653b7c544c53185efe53be078"; };
-"path-key@npm:3.1.1" = { filename = "path-key-npm-3.1.1-0e66ea8321-748c43efd5.zip"; sha512 = "748c43efd5a569c039d7a00a03b58eecd1d75f3999f5a28303d75f521288df4823bc057d8784eb72358b2895a05f29a070bc9f1f17d28226cc4e62494cc58c4c"; };
-"path-scurry@npm:1.10.1" = { filename = "path-scurry-npm-1.10.1-52bd946f2e-e5dc78a734.zip"; sha512 = "e5dc78a7348d25eec61ab166317e9e9c7b46818aa2c2b9006c507a6ff48c672d011292d9662527213e558f5652ce0afcc788663a061d8b59ab495681840c0c1e"; };
-"path-to-regexp@npm:6.2.1" = { filename = "path-to-regexp-npm-6.2.1-8ebfe03654-7a73811ca7.zip"; sha512 = "7a73811ca703e5c199e5b50b9649ab8f6f7b458a37f7dff9ea338815203f5b1f95fe8cb24d4fdfe2eab5d67ce43562d92534330babca35cdf3231f966adb9360"; };
-"pathval@npm:1.1.1" = { filename = "pathval-npm-1.1.1-ce0311d7e0-f63e1bc1b3.zip"; sha512 = "f63e1bc1b33593cdf094ed6ff5c49c1c0dc5dc20a646ca9725cc7fe7cd9995002d51d5685b9b2ec6814342935748b711bafa840f84c0bb04e38ff40a335c94dc"; };
-"pg-cloudflare@npm:1.1.1" = { filename = "pg-cloudflare-npm-1.1.1-fe242426f0-a68b957f75.zip"; sha512 = "a68b957f755be6af813d68ccaf4c906a000fd2ecb362cd281220052cc9e2f6c26da3b88792742387008c30b3bf0d2fa3a0eff04aeb8af4414023c99ae78e07bd"; };
-"pg-connection-string@npm:2.6.2" = { filename = "pg-connection-string-npm-2.6.2-43a4a40be5-e8fdea74fc.zip"; sha512 = "e8fdea74fcc8bdc3d7c5c6eadd9425fdba7e67fb7fe836f9c0cecad94c8984e435256657d1d8ce0483d1fedef667e7a57e32449a63cb805cb0289fc34b62da35"; };
-"pg-int8@npm:1.0.1" = { filename = "pg-int8-npm-1.0.1-5cd67f3e22-be6a02d851.zip"; sha512 = "be6a02d851fc2a4ae3e9de81710d861de3ba35ac927268973eb3cb618873a05b9424656df464dd43bd7dc3fc5295c3f5b3c8349494f87c7af50ec59ef14e0b98"; };
-"pg-numeric@npm:1.0.2" = { filename = "pg-numeric-npm-1.0.2-9026ec3427-43dd9884e7.zip"; sha512 = "43dd9884e7b52c79ddc28d2d282d7475fce8bba13452d33c04ceb2e0a65f561edf6699694e8e1c832ff9093770496363183c950dd29608e1bdd98f344b25bca9"; };
-"pg-pool@npm:3.6.1" = { filename = "pg-pool-npm-3.6.1-477c9660b9-47837c4e4c.zip"; sha512 = "47837c4e4c2b9e195cec01bd58b6e276acc915537191707ad4d6ed975fd9bc03c73f63cb7fde4cb0e08ed059e35faf60fbd03744dee3af71d4b4631ab40eeb7f"; };
-"pg-protocol@npm:1.6.0" = { filename = "pg-protocol-npm-1.6.0-089a4b1d3c-318a4d1e9c.zip"; sha512 = "318a4d1e9cebd3927b10a8bc412f5017117a1f9a5fafb628d75847da7d1ab81c33250de58596bd0990029e14e92a995a851286d60fc236692299faf509572213"; };
-"pg-types@npm:2.2.0" = { filename = "pg-types-npm-2.2.0-a3360226c4-ab3f8069a3.zip"; sha512 = "ab3f8069a323f601cd2d2279ca8c425447dab3f9b61d933b0601d7ffc00d6200df25e26a4290b2b0783b59278198f7dd2ed03e94c4875797919605116a577c65"; };
-"pg-types@npm:4.0.1" = { filename = "pg-types-npm-4.0.1-8f922557d3-e2126b2775.zip"; sha512 = "e2126b2775554ae8bacb3b104814487c2af2caff44cc52bee786b3887c65fe4c1fe031237e51e30ffed1cbb13b71776bd60cc1e65ac800c9946df4030849a074"; };
-"pg@npm:8.11.3" = { filename = "pg-npm-8.11.3-94865204fd-07e6967fc8.zip"; sha512 = "07e6967fc8bd5d72bab9be6620626e8e3ab59128ebf56bf0de83d67f10801a19221d88b3317e90b93339ba48d0498b39967b782ae39686aabda6bc647bceb438"; };
-"pgpass@npm:1.0.5" = { filename = "pgpass-npm-1.0.5-653e71ddd8-5ea6c9b2de.zip"; sha512 = "5ea6c9b2de04c33abb08d33a2dded303c4a3c7162a9264519cbe85c0a9857d712463140ba42fad0c7cd4b21f644dd870b45bb2e02fcbe505b4de0744fd802c1d"; };
-"picomatch@npm:2.3.1" = { filename = "picomatch-npm-2.3.1-c782cfd986-26c02b8d06.zip"; sha512 = "26c02b8d06f03206fc2ab8d16f19960f2ff9e81a658f831ecb656d8f17d9edc799e8364b1f4a7873e89d9702dff96204be0fa26fe4181f6843f040f819dac4be"; };
-"postgres-array@npm:2.0.0" = { filename = "postgres-array-npm-2.0.0-4f49dc1389-cbd56207e4.zip"; sha512 = "cbd56207e4141d7fbf08c86f2aebf21fa7064943d3f808ec85f442ff94b48d891e7a144cc02665fb2de5dbcb9b8e3183a2ac749959e794b4a4cfd379d7a21d08"; };
-"postgres-array@npm:3.0.2" = { filename = "postgres-array-npm-3.0.2-da6a3f1fed-644aa071f6.zip"; sha512 = "644aa071f67a66a59f641f8e623887d2b915bc102a32643e2aa8b54c11acd343c5ad97831ea444dd37bd4b921ba35add4aa2cb0c6b76700a8252c2324aeba5b4"; };
-"postgres-bytea@npm:1.0.0" = { filename = "postgres-bytea-npm-1.0.0-8c2b81fa73-febf2364b8.zip"; sha512 = "febf2364b8a8953695cac159eeb94542ead5886792a9627b97e33f6b5bb6e263bc0706ab47ec221516e79fbd6b2452d668841830fb3b49ec6c0fc29be61892ce"; };
-"postgres-bytea@npm:3.0.0" = { filename = "postgres-bytea-npm-3.0.0-5de4c664f6-41c79cc48a.zip"; sha512 = "41c79cc48aa730c5ba3eda6ab989a940034f07a1f57b8f2777dce56f1b8cca16c5870582932b5b10cc605048aef9b6157e06253c871b4717cafc6d00f55376aa"; };
-"postgres-date@npm:1.0.7" = { filename = "postgres-date-npm-1.0.7-aadfe5531e-0ff91fccc6.zip"; sha512 = "0ff91fccc64003e10b767fcfeefb5eaffbc522c93aa65d5051c49b3c4ce6cb93ab091a7d22877a90ad60b8874202c6f1d0f935f38a7235ed3b258efd54b97ca9"; };
-"postgres-date@npm:2.0.1" = { filename = "postgres-date-npm-2.0.1-00e0e0bc9e-2d3698958f.zip"; sha512 = "2d3698958f858b7d1df0a3929fb8750ccb43fa2c8ee9fec7a021e7926291f6c85ddd9d94d87cd6529d70bd2444f3e14fb5bb323af19ceaa733542cc05c5c653a"; };
-"postgres-interval@npm:1.2.0" = { filename = "postgres-interval-npm-1.2.0-ca6414744d-c1734c3cb7.zip"; sha512 = "c1734c3cb79e7f22579af0b268a463b1fa1d084e742a02a7a290c4f041e349456f3bee3b4ee0bb3f226828597f7b76deb615c1b857db9a742c45520100456272"; };
-"postgres-interval@npm:3.0.0" = { filename = "postgres-interval-npm-3.0.0-936c769b98-8b570b30ea.zip"; sha512 = "8b570b30ea37c685e26d136d34460f246f98935a1533defc4b53bb05ee23ae3dc7475b718ec7ea607a57894d8c6b4f1adf67ca9cc83a75bdacffd427d5c68de8"; };
-"postgres-range@npm:1.1.3" = { filename = "postgres-range-npm-1.1.3-46f68e1a9e-f46bc379a1.zip"; sha512 = "f46bc379a198a9e3282a222c8e432d77494854bd4fa0706dff01641846db0bf4f09a9723e7fbb202da34ec3b2d88fc50e26e4bbeded7df19646e3acd6a7465ce"; };
-"prettier@npm:3.1.0" = { filename = "prettier-npm-3.1.0-708d6027b1-a45ea70aa9.zip"; sha512 = "a45ea70aa97fde162ea4c4aba3dfc7859aa6a732a1db34458d9535dc3c2c16d3bc3fb5689e6cd76aa835562555303b02d9449fd2e15af3b73c8053557e25c5b6"; };
-"proc-log@npm:3.0.0" = { filename = "proc-log-npm-3.0.0-a8c21c2f0f-f66430e4ff.zip"; sha512 = "f66430e4ff947dbb996058f6fd22de2c66612ae1a89b097744e17fb18a4e8e7a86db99eda52ccf15e53f00b63f4ec0b0911581ff2aac0355b625c8eac509b0dc"; };
-"promise-retry@npm:2.0.1" = { filename = "promise-retry-npm-2.0.1-871f0b01b7-9c7045a1a2.zip"; sha512 = "9c7045a1a2928094b5b9b15336dcd2a7b1c052f674550df63cc3f36cd44028e5080448175b6f6ca32b642de81150f5e7b1a98b728f15cb069f2dd60ac2616b96"; };
-"qs@npm:6.11.2" = { filename = "qs-npm-6.11.2-b118bc1c6f-4f95d4ff18.zip"; sha512 = "4f95d4ff18ed480befcafa3390022817ffd3087fc65f146cceb40fc5edb9fa96cb31f648cae2fa96ca23818f0798bd63ad4ca369a0e22702fcd41379b3ab6571"; };
-"randombytes@npm:2.1.0" = { filename = "randombytes-npm-2.1.0-e3da76bccf-50395efda7.zip"; sha512 = "50395efda7a8c94f5dffab564f9ff89736064d32addf0cc7e8bf5e4166f09f8ded7a0849ca6c2d2a59478f7d90f78f20d8048bca3cdf8be09d8e8a10790388f3"; };
-"raw-body@npm:2.5.2" = { filename = "raw-body-npm-2.5.2-5cb9dfebc1-b201c4b660.zip"; sha512 = "b201c4b66049369a60e766318caff5cb3cc5a900efd89bdac431463822d976ad0670912c931fdbdcf5543207daf6f6833bca57aa116e1661d2ea91e12ca692c4"; };
-"rdf-canonize@npm:3.4.0" = { filename = "rdf-canonize-npm-3.4.0-87bb945794-c78ccd8ff9.zip"; sha512 = "c78ccd8ff99abf749005f6c596d5ceb16edd7a9508e430cd636b89fba8f75e5698f2dd8294aeca389463b1f983326f8d50c9d4ad0a9195cf945f02731a720dea"; };
-"readable-stream@npm:3.6.2" = { filename = "readable-stream-npm-3.6.2-d2a6069158-e37be5c79c.zip"; sha512 = "e37be5c79c376fdd088a45fa31ea2e423e5d48854be7a22a58869b4e84d25047b193f6acb54f1012331e1bcd667ffb569c01b99d36b0bd59658fb33f513511b7"; };
-"readdirp@npm:3.6.0" = { filename = "readdirp-npm-3.6.0-f950cc74ab-6fa848cf63.zip"; sha512 = "6fa848cf63d1b82ab4e985f4cf72bd55b7dcfd8e0a376905804e48c3634b7e749170940ba77b32804d5fe93b3cc521aa95a8d7e7d725f830da6d93f3669ce66b"; };
-"require-directory@npm:2.1.1" = { filename = "require-directory-npm-2.1.1-8608aee50b-83aa76a7bc.zip"; sha512 = "83aa76a7bc1531f68d92c75a2ca2f54f1b01463cb566cf3fbc787d0de8be30c9dbc211d1d46be3497dac5785fe296f2dd11d531945ac29730643357978966e99"; };
-"retry@npm:0.12.0" = { filename = "retry-npm-0.12.0-72ac7fb4cc-59933e8501.zip"; sha512 = "59933e8501727ba13ad73ef4a04d5280b3717fd650408460c987392efe9d7be2040778ed8ebe933c5cbd63da3dcc37919c141ef8af0a54a6e4fca5a2af177bfe"; };
-"rimraf@npm:3.0.2" = { filename = "rimraf-npm-3.0.2-2cb7dac69a-9cb7757acb.zip"; sha512 = "9cb7757acb489bd83757ba1a274ab545eafd75598a9d817e0c3f8b164238dd90eba50d6b848bd4dcc5f3040912e882dc7ba71653e35af660d77b25c381d402e8"; };
-"safe-buffer@npm:5.2.1" = { filename = "safe-buffer-npm-5.2.1-3481c8aa9b-6501914237.zip"; sha512 = "6501914237c0a86e9675d4e51d89ca3c21ffd6a31642efeba25ad65720bce6921c9e7e974e5be91a786b25aa058b5303285d3c15dbabf983a919f5f630d349f3"; };
-"safer-buffer@npm:2.1.2" = { filename = "safer-buffer-npm-2.1.2-8d5c0b705e-7e3c8b2e88.zip"; sha512 = "7e3c8b2e88a1841c9671094bbaeebd94448111dd90a81a1f606f3f67708a6ec57763b3b47f06da09fc6054193e0e6709e77325415dc8422b04497a8070fa02d4"; };
-"semver@npm:6.3.1" = { filename = "semver-npm-6.3.1-bcba31fdbe-e3d79b6090.zip"; sha512 = "e3d79b609071caa78bcb6ce2ad81c7966a46a7431d9d58b8800cfa9cb6a63699b3899a0e4bcce36167a284578212d9ae6942b6929ba4aa5015c079a67751d42d"; };
-"semver@npm:7.5.4" = { filename = "semver-npm-7.5.4-c4ad957fcd-5160b06975.zip"; sha512 = "5160b06975a38b11c1ab55950cb5b8a23db78df88275d3d8a42ccf1f29e55112ac995b3a26a522c36e3b5f76b0445f1eef70d696b8c7862a2b4303d7b0e7609e"; };
-"serialize-javascript@npm:6.0.0" = { filename = "serialize-javascript-npm-6.0.0-0bb8a3c88d-73104922ef.zip"; sha512 = "73104922ef0a919064346eea21caab99de1a019a1f5fb54a7daa7fcabc39e83b387a2a363e52a889598c3b1bcf507c4b2a7b26df76e991a310657af20eea2e7c"; };
-"set-blocking@npm:2.0.0" = { filename = "set-blocking-npm-2.0.0-49e2cffa24-9f8c1b2d80.zip"; sha512 = "9f8c1b2d800800d0b589de1477c753492de5c1548d4ade52f57f1d1f5e04af5481554d75ce5e5c43d4004b80a3eb714398d6907027dc0534177b7539119f4454"; };
-"set-function-length@npm:1.1.1" = { filename = "set-function-length-npm-1.1.1-d362bf8221-a29e255c11.zip"; sha512 = "a29e255c116c29e3323b851c4f46c58c91be9bb8b065f191e2ea1807cb2c839df56e3175732a498e0c6d54626ba6b6fef896bf699feb7ab70c42dc47eb247c95"; };
-"setimmediate@npm:1.0.5" = { filename = "setimmediate-npm-1.0.5-54587459b6-5bae81bfdb.zip"; sha512 = "5bae81bfdbfbd0ce992893286d49c9693c82b1bcc00dcaaf3a09c8f428fdeacf4190c013598b81875dfac2b08a572422db7df779a99332d0fce186d15a3e4d49"; };
-"setprototypeof@npm:1.2.0" = { filename = "setprototypeof-npm-1.2.0-0fedbdcd3a-6873317302.zip"; sha512 = "68733173026766fa0d9ecaeb07f0483f4c2dc70ca376b3b7c40b7cda909f94b0918f6c5ad5ce27a9160bdfb475efaa9d5e705a11d8eaae18f9835d20976028bc"; };
-"shebang-command@npm:2.0.0" = { filename = "shebang-command-npm-2.0.0-eb2b01921d-a41692e7d8.zip"; sha512 = "a41692e7d89a553ef21d324a5cceb5f686d1f3c040759c50aab69688634688c5c327f26f3ecf7001ebfd78c01f3c7c0a11a7c8bfd0a8bc9f6240d4f40b224e4e"; };
-"shebang-regex@npm:3.0.0" = { filename = "shebang-regex-npm-3.0.0-899a0cd65e-1dbed0726d.zip"; sha512 = "1dbed0726dd0e1152a92696c76c7f06084eb32a90f0528d11acd764043aacf76994b2fb30aa1291a21bd019d6699164d048286309a278855ee7bec06cf6fb690"; };
-"side-channel@npm:1.0.4" = { filename = "side-channel-npm-1.0.4-e1f38b9e06-054a5d23ee.zip"; sha512 = "054a5d23ee35054b2c4609b9fd2a0587760737782b5d765a9c7852264710cc39c6dcb56a9bbd6c12cd84071648aea3edb2359d2f6e560677eedadce511ac1da5"; };
-"signal-exit@npm:3.0.7" = { filename = "signal-exit-npm-3.0.7-bd270458a3-25d272fa73.zip"; sha512 = "25d272fa73e146048565e08f3309d5b942c1979a6f4a58a8c59d5fa299728e9c2fcd1a759ec870863b1fd38653670240cd420dad2ad9330c71f36608a6a1c912"; };
-"signal-exit@npm:4.1.0" = { filename = "signal-exit-npm-4.1.0-61fb957687-41602dce54.zip"; sha512 = "41602dce540e46d599edba9d9860193398d135f7ff72cab629db5171516cfae628d21e7bfccde1bbfdf11c48726bc2a6d1a8fb8701125852fbfda7cf19c6aa83"; };
-"simple-concat@npm:1.0.1" = { filename = "simple-concat-npm-1.0.1-48df70de29-62f7508e67.zip"; sha512 = "62f7508e674414008910b5397c1811941d457dfa0db4fd5aa7fa0409eb02c3609608dfcd7508cace75b3a0bf67a2a77990711e32cd213d2c76f4fd12ee86d776"; };
-"simple-get@npm:3.1.1" = { filename = "simple-get-npm-3.1.1-dce5923dba-438c78844e.zip"; sha512 = "438c78844ea1b1e7268d13ee0b3a39c7d644183367aec916aed3b676b45d3037a61d9f975c200a49b42eb851f29f03745118af1e13c01e60a7b4044f2fd60be7"; };
-"smart-buffer@npm:4.2.0" = { filename = "smart-buffer-npm-4.2.0-5ac3f668bb-a16775323e.zip"; sha512 = "a16775323e1404dd43fabafe7460be13a471e021637bc7889468eb45ce6a6b207261f454e4e530a19500cc962c4cc5348583520843b363f4193cee5c00e1e539"; };
-"socks-proxy-agent@npm:8.0.2" = { filename = "socks-proxy-agent-npm-8.0.2-df165543cf-a842402fc9.zip"; sha512 = "a842402fc9b8848a31367f2811ca3cd14c4106588b39a0901cd7a69029998adfc6456b0203617c18ed090542ad0c24ee4e9d4c75a0c4b75071e214227c177eb7"; };
-"socks@npm:2.7.1" = { filename = "socks-npm-2.7.1-17f2b53052-43f69dbc9f.zip"; sha512 = "43f69dbc9f34fc8220bc51c6eea1c39715ab3cfdb115d6e3285f6c7d1a603c5c75655668a5bbc11e3c7e2c99d60321fb8d7ab6f38cda6a215fadd0d6d0b52130"; };
-"split2@npm:4.2.0" = { filename = "split2-npm-4.2.0-16aa3883ba-b292beb8ce.zip"; sha512 = "b292beb8ce9215f8c642bb68be6249c5a4c7f332fc8ecadae7be5cbdf1ea95addc95f0459ef2e7ad9d45fd1064698a097e4eb211c83e772b49bc0ee423e91534"; };
-"ssri@npm:10.0.5" = { filename = "ssri-npm-10.0.5-1a7557d04d-b091f2ae92.zip"; sha512 = "b091f2ae92474183c7ac5ed3f9811457e1df23df7a7e70c9476eaa9a0c4a0c8fc190fb45acefbf023ca9ee864dd6754237a697dc52a0fb182afe65d8e77443d8"; };
-"statuses@npm:1.5.0" = { filename = "statuses-npm-1.5.0-f88f91b2e9-e433900956.zip"; sha512 = "e433900956357b3efd79b1c547da4d291799ac836960c016d10a98f6a810b1b5c0dcc13b5a7aa609a58239b5190e1ea176ad9221c2157d2fd1c747393e6b2940"; };
-"statuses@npm:2.0.1" = { filename = "statuses-npm-2.0.1-81d2b97fee-34378b207a.zip"; sha512 = "34378b207a1620a24804ce8b5d230fea0c279f00b18a7209646d5d47e419d1cc23e7cbf33a25a1e51ac38973dc2ac2e1e9c647a8e481ef365f77668d72becfd0"; };
-"string-width@npm:4.2.3" = { filename = "string-width-npm-4.2.3-2c27177bae-1e525e92e5.zip"; sha512 = "1e525e92e5eae0afd7454086eed9c818ee84374bb80328fc41217ae72ff5f065ef1c9d7f72da41de40c75fa8bb3dee63d92373fd492c84260a552c636392a47b"; };
-"string-width@npm:5.1.2" = { filename = "string-width-npm-5.1.2-bf60531341-ab9c426444.zip"; sha512 = "ab9c4264443d35b8b923cbdd513a089a60de339216d3b0ed3be3ba57d6880e1a192b70ae17225f764d7adbf5994e9bb8df253a944736c15a0240eff553c678ca"; };
-"string_decoder@npm:1.3.0" = { filename = "string_decoder-npm-1.3.0-2422117fd0-810614ddb0.zip"; sha512 = "810614ddb030e271cd591935dcd5956b2410dd079d64ff92a1844d6b7588bf992b3e1b69b0f4d34a3e06e0bd73046ac646b5264c1987b20d0601f81ef35d731d"; };
-"strip-ansi@npm:6.0.1" = { filename = "strip-ansi-npm-6.0.1-caddc7cb40-1ae5f212a1.zip"; sha512 = "1ae5f212a126fe5b167707f716942490e3933085a5ff6c008ab97ab2f272c8025d3aa218b7bd6ab25729ca20cc81cddb252102f8751e13482a5199e873680952"; };
-"strip-ansi@npm:7.1.0" = { filename = "strip-ansi-npm-7.1.0-7453b80b79-a198c3762e.zip"; sha512 = "a198c3762e8832505328cbf9e8c8381de14a4fa50a4f9b2160138158ea88c0f5549fb50cb13c651c3088f47e63a108b34622ec18c0499b6c8c3a5ddf6b305ac4"; };
-"strip-json-comments@npm:3.1.1" = { filename = "strip-json-comments-npm-3.1.1-dcb2324823-9681a6257b.zip"; sha512 = "9681a6257b925a7fa0f285851c0e613cc934a50661fa7bb41ca9cbbff89686bb4a0ee366e6ecedc4daafd01e83eee0720111ab294366fe7c185e935475ebcecd"; };
-"supports-color@npm:7.2.0" = { filename = "supports-color-npm-7.2.0-606bfcf7da-afb4c88521.zip"; sha512 = "afb4c88521b8b136b5f5f95160c98dee7243dc79d5432db7efc27efb219385bbc7d9427398e43dd6cc730a0f87d5085ce1652af7efbe391327bc0a7d0f7fc124"; };
-"supports-color@npm:8.1.1" = { filename = "supports-color-npm-8.1.1-289e937149-ea1d3c275d.zip"; sha512 = "ea1d3c275dd604c974670f63943ed9bd83623edc102430c05adb8efc56ba492746b6e95386e7831b872ec3807fd89dd8eb43f735195f37b5ec343e4234cc7e89"; };
-"tar@npm:6.2.0" = { filename = "tar-npm-6.2.0-3eb25205a7-02ca064a1a.zip"; sha512 = "02ca064a1a6b4521fef88c07d389ac0936730091f8c02d30ea60d472e0378768e870769ab9e986d87807bfee5654359cf29ff4372746cc65e30cbddc352660d8"; };
-"to-regex-range@npm:5.0.1" = { filename = "to-regex-range-npm-5.0.1-f1e8263b00-487988b0a1.zip"; sha512 = "487988b0a19c654ff3e1961b87f471702e708fa8a8dd02a298ef16da7206692e8552a0250e8b3e8759270f62e9d8314616f6da274734d3b558b1fc7b7724e892"; };
-"toidentifier@npm:1.0.1" = { filename = "toidentifier-npm-1.0.1-f759712599-9393727993.zip"; sha512 = "93937279934bd66cc3270016dd8d0afec14fb7c94a05c72dc57321f8bd1fa97e5bea6d1f7c89e728d077ca31ea125b78320a616a6c6cd0e6b9cb94cb864381c1"; };
-"tr46@npm:0.0.3" = { filename = "tr46-npm-0.0.3-de53018915-047cb209a6.zip"; sha512 = "047cb209a6b60c742f05c9d3ace8fa510bff609995c129a37ace03476a9b12db4dbf975e74600830ef0796e18882b2381fb5fb1f6b4f96b832c374de3ab91a11"; };
-"tslib@npm:2.6.2" = { filename = "tslib-npm-2.6.2-4fc8c068d9-e03a8a4271.zip"; sha512 = "e03a8a4271152c8b26604ed45535954c0a45296e32445b4b87f8a5abdb2421f40b59b4ca437c4346af0f28179780d604094eb64546bee2019d903d01c6c19bdb"; };
-"tsscmp@npm:1.0.6" = { filename = "tsscmp-npm-1.0.6-3223087558-2f79a9455e.zip"; sha512 = "2f79a9455e7e3e8071995f98cdf3487ccfc91b760bec21a9abb4d90519557eafaa37246e87c92fa8bf3fef8fd30cfd0cc3c4212bb929baa9fb62494bfa4d24b2"; };
-"type-detect@npm:4.0.8" = { filename = "type-detect-npm-4.0.8-8d8127b901-8fb9a51d3f.zip"; sha512 = "8fb9a51d3f365a7de84ab7f73b653534b61b622aa6800aecdb0f1095a4a646d3f5eb295322127b6573db7982afcd40ab492d038cf825a42093a58b1e1353e0bd"; };
-"type-is@npm:1.6.18" = { filename = "type-is-npm-1.6.18-6dee4d4961-a23daeb538.zip"; sha512 = "a23daeb538591b7efbd61ecf06b6feb2501b683ffdc9a19c74ef5baba362b4347e42f1b4ed81f5882a8c96a3bfff7f93ce3ffaf0cbbc879b532b04c97a55db9d"; };
-"typescript@npm:5.3.2" = { filename = "typescript-npm-5.3.2-a11892b3bc-d7dbe1fbe1.zip"; sha512 = "d7dbe1fbe19039e36a65468ea64b5d338c976550394ba576b7af9c68ed40c0bc5d12ecce390e4b94b287a09a71bd3229f19c2d5680611f35b7c53a3898791159"; };
-"typescript@patch:typescript@npm%3A5.3.2#optional!builtin<compat/typescript>::version=5.3.2&hash=e012d7" = { filename = "typescript-patch-71fdfda6a2-73c8bad74e.zip"; sha512 = "73c8bad74e732d93211c9d77f28b03307e2f5fc6a0afc73f4b783261ab567686a16d6ae958bdaef383a00be1b0b8c8b6741dd6ca3d13af4963fa7e47456d49c7"; };
-"undici-types@npm:5.26.5" = { filename = "undici-types-npm-5.26.5-de4f7c7bb9-bb673d7876.zip"; sha512 = "bb673d7876c2d411b6eb6c560e0c571eef4a01c1c19925175d16e3a30c4c428181fb8d7ae802a261f283e4166a0ac435e2f505743aa9e45d893f9a3df017b501"; };
-"undici@npm:5.27.2" = { filename = "undici-npm-5.27.2-141c109c0a-0cb62c57ed.zip"; sha512 = "0cb62c57edc938f242c116e41fb2a74f81ed20e7e2e554cf1ceae548520df0592385b53d444f8cf59e1e10e6b27acd153198d8a2353b3040d0a778a099aac92c"; };
-"unique-filename@npm:3.0.0" = { filename = "unique-filename-npm-3.0.0-77d68e0a45-6363e40b2f.zip"; sha512 = "6363e40b2fa758eb5ec5e21b3c7fb83e5da8dcfbd866cc0c199d5534c42f03b9ea9ab069769cc388e1d7ab93b4eeef28ef506ab5f18d910ef29617715101884f"; };
-"unique-slug@npm:4.0.0" = { filename = "unique-slug-npm-4.0.0-e6b08f28aa-cb811d9d54.zip"; sha512 = "cb811d9d54eb5821b81b18205750be84cb015c20a4a44280794e915f5a0a70223ce39066781a354e872df3572e8155c228f43ff0cce94c7cbf4da2cc7cbdd635"; };
-"unpipe@npm:1.0.0" = { filename = "unpipe-npm-1.0.0-2ed2a3c2bf-193400255b.zip"; sha512 = "193400255bd48968e5c5383730344fbb4fa114cdedfab26e329e50dd2d81b134244bb8a72c6ac1b10ab0281a58b363d06405632c9d49ca9dfd5e90cbd7d0f32c"; };
-"util-deprecate@npm:1.0.2" = { filename = "util-deprecate-npm-1.0.2-e3fe1a219c-41a5bdd214.zip"; sha512 = "41a5bdd214df2f6c3ecf8622745e4a366c4adced864bc3c833739791aeeeb1838119af7daed4ba36428114b5c67dcda034a79c882e97e43c03e66a4dd7389942"; };
-"uuid@npm:9.0.1" = { filename = "uuid-npm-9.0.1-39a8442bc6-1607dd32ac.zip"; sha512 = "1607dd32ac7fc22f2d8f77051e6a64845c9bce5cd3dd8aa0070c074ec73e666a1f63c7b4e0f4bf2bc8b9d59dc85a15e17807446d9d2b17c8485fbc2147b27f9b"; };
-"vary@npm:1.1.2" = { filename = "vary-npm-1.1.2-b49f70ae63-f15d588d79.zip"; sha512 = "f15d588d79f3675135ba783c91a4083dcd290a2a5be9fcb6514220a1634e23df116847b1cc51f66bfb0644cf9353b2abb7815ae499bab06e46dd33c1a6bf1f4f"; };
-"web-streams-polyfill@npm:3.2.1" = { filename = "web-streams-polyfill-npm-3.2.1-835bd3857e-70ed6b5708.zip"; sha512 = "70ed6b5708e14afa2ab699221ea197d7c68ec0c8274bbe0181aecc5ba636ca27cbd383d2049f0eb9d529e738f5c088825502b317f3df24d18a278e4cc9a10e8b"; };
-"webidl-conversions@npm:3.0.1" = { filename = "webidl-conversions-npm-3.0.1-60310f6a2b-5612d5f3e5.zip"; sha512 = "5612d5f3e54760a797052eb4927f0ddc01383550f542ccd33d5238cfd65aeed392a45ad38364970d0a0f4fea32e1f4d231b3d8dac4a3bdd385e5cf802ae097db"; };
-"whatwg-url@npm:5.0.0" = { filename = "whatwg-url-npm-5.0.0-374fb45e60-1588bed84d.zip"; sha512 = "1588bed84d10b72d5eec1d0faa0722ba1962f1821e7539c535558fb5398d223b0c50d8acab950b8c488b4ba69043fd833cc2697056b167d8ad46fac3995a55d5"; };
-"which@npm:2.0.2" = { filename = "which-npm-2.0.2-320ddf72f7-66522872a7.zip"; sha512 = "66522872a768b60c2a65a57e8ad184e5372f5b6a9ca6d5f033d4b0dc98aff63995655a7503b9c0a2598936f532120e81dd8cc155e2e92ed662a2b9377cc4374f"; };
-"which@npm:4.0.0" = { filename = "which-npm-4.0.0-dd31cd4928-449fa5c44e.zip"; sha512 = "449fa5c44ed120ccecfe18c433296a4978a7583bf2391c50abce13f76878d2476defde04d0f79db8165bdf432853c1f8389d0485ca6e8ebce3bbcded513d5e6a"; };
-"wide-align@npm:1.1.5" = { filename = "wide-align-npm-1.1.5-889d77e592-1d9c2a3e36.zip"; sha512 = "1d9c2a3e36dfb09832f38e2e699c367ef190f96b82c71f809bc0822c306f5379df87bab47bed27ea99106d86447e50eb972d3c516c2f95782807a9d082fbea95"; };
-"workerpool@npm:6.2.1" = { filename = "workerpool-npm-6.2.1-1486cb2056-f0efd2d74e.zip"; sha512 = "f0efd2d74eafd58eaeb36d7d85837d080f75c52b64893cff317b66257dd308e5c9f85ef0b12904f6c7f24ed2365bc3cfeba1f1d16aa736d84d6ef8156ae37c80"; };
-"wrap-ansi@npm:7.0.0" = { filename = "wrap-ansi-npm-7.0.0-ad6e1a0554-d15fc12c11.zip"; sha512 = "d15fc12c11e4cbc4044a552129ebc75ee3f57aa9c1958373a4db0292d72282f54373b536103987a4a7594db1ef6a4f10acf92978f79b98c49306a4b58c77d4da"; };
-"wrap-ansi@npm:8.1.0" = { filename = "wrap-ansi-npm-8.1.0-26a4e6ae28-138ff58a41.zip"; sha512 = "138ff58a41d2f877eae87e3282c0630fc2789012fc1af4d6bd626eeb9a2f9a65ca92005e6e69a75c7b85a68479fe7443c7dbe1eb8fbaa681a4491364b7c55c60"; };
-"wrappy@npm:1.0.2" = { filename = "wrappy-npm-1.0.2-916de4d4b3-56fece1a40.zip"; sha512 = "56fece1a4018c6a6c8e28fbc88c87e0fbf4ea8fd64fc6c63b18f4acc4bd13e0ad2515189786dd2c30d3eec9663d70f4ecf699330002f8ccb547e4a18231fc9f0"; };
-"xtend@npm:4.0.2" = { filename = "xtend-npm-4.0.2-7f2375736e-366ae4783e.zip"; sha512 = "366ae4783eec6100f8a02dff02ac907bf29f9a00b82ac0264b4d8b832ead18306797e283cf19de776538babfdcb2101375ec5646b59f08c52128ac4ab812ed0e"; };
-"y18n@npm:5.0.8" = { filename = "y18n-npm-5.0.8-5f3a0a7e62-4df2842c36.zip"; sha512 = "4df2842c36e468590c3691c894bc9cdbac41f520566e76e24f59401ba7d8b4811eb1e34524d57e54bc6d864bcb66baab7ffd9ca42bf1eda596618f9162b91249"; };
-"yallist@npm:4.0.0" = { filename = "yallist-npm-4.0.0-b493d9e907-2286b5e8db.zip"; sha512 = "2286b5e8dbfe22204ab66e2ef5cc9bbb1e55dfc873bbe0d568aa943eb255d131890dfd5bf243637273d31119b870f49c18fcde2c6ffbb7a7a092b870dc90625a"; };
-"yargs-parser@npm:20.2.4" = { filename = "yargs-parser-npm-20.2.4-1de20916a6-08dc341f0b.zip"; sha512 = "08dc341f0b9f940c2fffc1d1decf3be00e28cabd2b578a694901eccc7dcd10577f10c6aa1b040fdd9a68b2042515a60f18476543bccacf9f3ce2c8534cd87435"; };
-"yargs-parser@npm:20.2.9" = { filename = "yargs-parser-npm-20.2.9-a1d19e598d-0685a8e58b.zip"; sha512 = "0685a8e58bbfb57fab6aefe03c6da904a59769bd803a722bb098bd5b0f29d274a1357762c7258fb487512811b8063fb5d2824a3415a0a4540598335b3b086c72"; };
-"yargs-unparser@npm:2.0.0" = { filename = "yargs-unparser-npm-2.0.0-930f3ff3f6-a5a7d6dc15.zip"; sha512 = "a5a7d6dc157efa95122e16780c019f40ed91d4af6d2bac066db8194ed0ec5c330abb115daa5a79ff07a9b80b8ea80c925baacf354c4c12edd878c0529927ff03"; };
-"yargs@npm:16.2.0" = { filename = "yargs-npm-16.2.0-547873d425-b1dbfefa67.zip"; sha512 = "b1dbfefa679848442454b60053a6c95d62f2d2e21dd28def92b647587f415969173c6e99a0f3bab4f1b67ee8283bf735ebe3544013f09491186ba9e8a9a2b651"; };
-"ylru@npm:1.3.2" = { filename = "ylru-npm-1.3.2-81969d097f-1fcdf0e642.zip"; sha512 = "1fcdf0e6428fa4be71d8b1ae96ee6134d8c6194bd23e531b755b9d90bb9c555592415dc629501fe9036dfa410e2e71d0d093e5c91625df46d8e546a29e658ebe"; };
-"yocto-queue@npm:0.1.0" = { filename = "yocto-queue-npm-0.1.0-c6c9a7db29-dceb44c285.zip"; sha512 = "dceb44c28578b31641e13695d200d34ec4ab3966a5729814d5445b194933c096b7ced71494ce53a0e8820685d1d010df8b2422e5bf2cdea7e469d97ffbea306f"; };
-};
-isolated."canvas@npm:2.11.2" = optionalOverride (args.overrideCanvasAttrs or null) (mkIsolatedBuild { pname = "canvas"; version = "2.11.2"; reference = "npm:2.11.2"; locators = [
-"@isaacs/cliui@npm:8.0.2"
-"@mapbox/node-pre-gyp@npm:1.0.11"
-"@npmcli/agent@npm:2.2.0"
-"@npmcli/fs@npm:3.1.0"
-"@pkgjs/parseargs@npm:0.11.0"
-"abbrev@npm:1.1.1"
-"abbrev@npm:2.0.0"
-"agent-base@npm:6.0.2"
-"agent-base@npm:7.1.0"
-"aggregate-error@npm:3.1.0"
-"ansi-regex@npm:5.0.1"
-"ansi-regex@npm:6.0.1"
-"ansi-styles@npm:4.3.0"
-"ansi-styles@npm:6.2.1"
-"aproba@npm:2.0.0"
-"are-we-there-yet@npm:2.0.0"
-"balanced-match@npm:1.0.2"
-"brace-expansion@npm:1.1.11"
-"brace-expansion@npm:2.0.1"
-"cacache@npm:18.0.0"
-"canvas@npm:2.11.2"
-"chownr@npm:2.0.0"
-"clean-stack@npm:2.2.0"
-"color-convert@npm:2.0.1"
-"color-name@npm:1.1.4"
-"color-support@npm:1.1.3"
-"concat-map@npm:0.0.1"
-"console-control-strings@npm:1.1.0"
-"cross-spawn@npm:7.0.3"
-"debug@npm:4.3.4"
-"decompress-response@npm:4.2.1"
-"delegates@npm:1.0.0"
-"detect-libc@npm:2.0.2"
-"eastasianwidth@npm:0.2.0"
-"emoji-regex@npm:8.0.0"
-"emoji-regex@npm:9.2.2"
-"encoding@npm:0.1.13"
-"env-paths@npm:2.2.1"
-"err-code@npm:2.0.3"
-"exponential-backoff@npm:3.1.1"
-"foreground-child@npm:3.1.1"
-"fs-minipass@npm:2.1.0"
-"fs-minipass@npm:3.0.3"
-"fs.realpath@npm:1.0.0"
-"gauge@npm:3.0.2"
-"glob@npm:10.3.10"
-"glob@npm:7.2.3"
-"graceful-fs@npm:4.2.11"
-"has-unicode@npm:2.0.1"
-"http-cache-semantics@npm:4.1.1"
-"http-proxy-agent@npm:7.0.0"
-"https-proxy-agent@npm:5.0.1"
-"https-proxy-agent@npm:7.0.2"
-"iconv-lite@npm:0.6.3"
-"imurmurhash@npm:0.1.4"
-"indent-string@npm:4.0.0"
-"inflight@npm:1.0.6"
-"inherits@npm:2.0.4"
-"ip@npm:2.0.0"
-"is-fullwidth-code-point@npm:3.0.0"
-"is-lambda@npm:1.0.1"
-"isexe@npm:2.0.0"
-"isexe@npm:3.1.1"
-"jackspeak@npm:2.3.6"
-"lru-cache@npm:10.1.0"
-"lru-cache@npm:6.0.0"
-"make-dir@npm:3.1.0"
-"make-fetch-happen@npm:13.0.0"
-"mimic-response@npm:2.1.0"
-"minimatch@npm:3.1.2"
-"minimatch@npm:9.0.3"
-"minipass-collect@npm:1.0.2"
-"minipass-fetch@npm:3.0.4"
-"minipass-flush@npm:1.0.5"
-"minipass-pipeline@npm:1.2.4"
-"minipass-sized@npm:1.0.3"
-"minipass@npm:3.3.6"
-"minipass@npm:5.0.0"
-"minipass@npm:7.0.4"
-"minizlib@npm:2.1.2"
-"mkdirp@npm:1.0.4"
-"ms@npm:2.1.2"
-"nan@npm:2.18.0"
-"negotiator@npm:0.6.3"
-"node-fetch@npm:2.7.0"
-"node-gyp@npm:10.0.1"
-"nopt@npm:5.0.0"
-"nopt@npm:7.2.0"
-"npmlog@npm:5.0.1"
-"object-assign@npm:4.1.1"
-"once@npm:1.4.0"
-"p-map@npm:4.0.0"
-"path-is-absolute@npm:1.0.1"
-"path-key@npm:3.1.1"
-"path-scurry@npm:1.10.1"
-"proc-log@npm:3.0.0"
-"promise-retry@npm:2.0.1"
-"readable-stream@npm:3.6.2"
-"retry@npm:0.12.0"
-"rimraf@npm:3.0.2"
-"safe-buffer@npm:5.2.1"
-"safer-buffer@npm:2.1.2"
-"semver@npm:6.3.1"
-"semver@npm:7.5.4"
-"set-blocking@npm:2.0.0"
-"shebang-command@npm:2.0.0"
-"shebang-regex@npm:3.0.0"
-"signal-exit@npm:3.0.7"
-"signal-exit@npm:4.1.0"
-"simple-concat@npm:1.0.1"
-"simple-get@npm:3.1.1"
-"smart-buffer@npm:4.2.0"
-"socks-proxy-agent@npm:8.0.2"
-"socks@npm:2.7.1"
-"ssri@npm:10.0.5"
-"string-width@npm:4.2.3"
-"string-width@npm:5.1.2"
-"string_decoder@npm:1.3.0"
-"strip-ansi@npm:6.0.1"
-"strip-ansi@npm:7.1.0"
-"tar@npm:6.2.0"
-"tr46@npm:0.0.3"
-"unique-filename@npm:3.0.0"
-"unique-slug@npm:4.0.0"
-"util-deprecate@npm:1.0.2"
-"webidl-conversions@npm:3.0.1"
-"whatwg-url@npm:5.0.0"
-"which@npm:2.0.2"
-"which@npm:4.0.0"
-"wide-align@npm:1.1.5"
-"wrap-ansi@npm:7.0.0"
-"wrap-ansi@npm:8.1.0"
-"wrappy@npm:1.0.2"
-"yallist@npm:4.0.0"
-]; });
+
+
 in overriddenProject

@@ -1,4 +1,4 @@
-import { NamedNode, BlankNode, Literal, Quad } from "rdf-js";
+import { NamedNode, BlankNode, Literal, Quad } from "@rdfjs/types";
 
 import { XML, RDF } from "./consts.js";
 

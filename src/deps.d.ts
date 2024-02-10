@@ -3,14 +3,16 @@
 // Custom declarations for jsonld, because the `@types/jsonld` package is too
 // limited. (No factory interface, no promise interface, no `toRDF` types.)
 declare module "jsonld" {
-  // `toRDF` emits plain objects, that otherwise follow the `rdf-js`
+  // `toRDF` emits plain objects, that otherwise follow the `@rdfjs/types`
   // interface, but don't have any of the methods.
   type ExcludeMethods<T> = Exclude<T, { [prop: string]: Function }>;
 
-  export type NamedNode = ExcludeMethods<import("rdf-js").NamedNode>;
-  export type BlankNode = ExcludeMethods<import("rdf-js").BlankNode>;
-  export type Literal = ExcludeMethods<import("rdf-js").Literal>;
-  export type DefaultGraph = ExcludeMethods<import("rdf-js").DefaultGraph>;
+  export type NamedNode = ExcludeMethods<import("@rdfjs/types").NamedNode>;
+  export type BlankNode = ExcludeMethods<import("@rdfjs/types").BlankNode>;
+  export type Literal = ExcludeMethods<import("@rdfjs/types").Literal>;
+  export type DefaultGraph = ExcludeMethods<
+    import("@rdfjs/types").DefaultGraph
+  >;
 
   export type Term = NamedNode | BlankNode | Literal | DefaultGraph;
 
