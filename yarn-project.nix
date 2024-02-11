@@ -27,6 +27,8 @@ let
   drvCommon = {
     # Make sure the build uses the right Node.js version everywhere.
     buildInputs = [ nodejs yarn ];
+    # All dependencies should already be cached.
+    yarn_enable_network = "0";
     # Tell node-gyp to use the provided Node.js headers for native code builds.
     npm_config_nodedir = nodejs;
   };
@@ -56,6 +58,38 @@ let
     outputHash = "sha512-OAt+xFW89iuT/0pW7qPI4vNBID1jCTtYd2zPBIcjlfPx0YCc2HpQLSPKKjmff4YtYWJEJkMQMaypzSUDt1hVFQ==";
   };
 
+  # Create a derivation that builds a module in isolation.
+  mkIsolatedBuild = { pname, version, reference, locators ? [] }: stdenv.mkDerivation (drvCommon // {
+    inherit pname version;
+    dontUnpack = true;
+
+    configurePhase = ''
+      ${buildVars}
+      unset yarn_enable_nixify # plugin is not present
+    '';
+
+    buildPhase = ''
+      mkdir -p .yarn/cache
+      cp --reflink=auto --recursive ${cacheDrv}/* .yarn/cache/
+
+      echo '{ "dependencies": { "${pname}": "${reference}" } }' > package.json
+      install -m 0600 ${lockfile} ./yarn.lock
+      export yarn_global_folder="$TMP"
+      export yarn_enable_global_cache=false
+      export yarn_enable_immutable_installs=false
+      yarn
+    '';
+
+    installPhase = ''
+      unplugged=( .yarn/unplugged/${pname}-*/node_modules/* )
+      if [[ ! -e "''${unplugged[@]}" ]]; then
+        echo >&2 "Could not find the unplugged path for ${pname}"
+        exit 1
+      fi
+
+      mv "$unplugged" $out
+    '';
+  });
 
   # Main project derivation.
   project = stdenv.mkDerivation (drvCommon // {
@@ -88,7 +122,13 @@ let
       # hardcoded values.
       runHook preConfigure
 
-
+      # Copy in isolated builds.
+      echo 'injecting build for canvas'
+      yarn nixify inject-build \
+        "canvas@npm:2.11.2" \
+        ${isolated."canvas@npm:2.11.2"} \
+        ".yarn/unplugged/canvas-npm-2.11.2-824d893a31/node_modules/canvas"
+      echo 'running yarn install'
 
       # Run normal Yarn install to complete dependency installation.
       yarn install --immutable --immutable-cache
@@ -131,7 +171,6 @@ let
       mkdir -p "$out/bin"
       yarn nixify install-bin $out/bin
 
-
       runHook postInstall
     '';
 
@@ -146,6 +185,5 @@ let
 
   overriddenProject = optionalOverride overrideAttrs project;
 
-
-
+isolated."canvas@npm:2.11.2" = optionalOverride (args.overrideCanvasAttrs or null) (mkIsolatedBuild { pname = "canvas"; version = "2.11.2"; reference = "npm:2.11.2"; });
 in overriddenProject

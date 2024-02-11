@@ -37,8 +37,8 @@
               buildPhase = "yarn build";
               checkPhase = "yarn test";
               doCheck = true;
-
-              # For canvas
+            };
+            overrideCanvasAttrs = old: {
               buildInputs = old.buildInputs ++ canvasDeps;
               env = lib.optionalAttrs (stdenv.isDarwin && stdenv.isx86_64) {
                 NIX_CFLAGS_COMPILE = "-D__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__=101300";
