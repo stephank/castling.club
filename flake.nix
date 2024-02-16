@@ -19,8 +19,9 @@
         };
 
         # Packages required to build the `canvas` npm package.
+        nativeCanvasDeps = with pkgs; [ python3 pkg-config ];
         canvasDeps = with pkgs; (
-          [ python3 pkg-config pixman cairo pango libjpeg ]
+          [ pixman cairo pango libjpeg ]
           ++ lib.optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks;
           [ CoreText xcbuild ]
           )
@@ -39,7 +40,8 @@
               doCheck = true;
             };
             overrideCanvasAttrs = old: {
-              buildInputs = old.buildInputs ++ canvasDeps;
+              nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ nativeCanvasDeps;
+              buildInputs = (old.buildInputs or [ ]) ++ canvasDeps;
               env = lib.optionalAttrs (stdenv.isDarwin && stdenv.isx86_64) {
                 NIX_CFLAGS_COMPILE = "-D__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__=101300";
               };
@@ -54,6 +56,7 @@
 
         # For `nix develop`
         devShells.default = pkgs.mkShell {
+          nativeBuildInputs = nativeCanvasDeps;
           buildInputs = (with pkgs; [ postgresql nixpkgs-fmt ])
             ++ canvasDeps
             ++ [ nodejs corepack ];
