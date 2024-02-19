@@ -10,14 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
-      - run: corepack enable
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "yarn"
-
-      # Partial Yarn install for preloading.
-      - run: yarn --mode=skip-build
-
-      # Run tests.
-      - run: nix flake check -v -L
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix flake check -vL
+        timeout-minutes: 15
