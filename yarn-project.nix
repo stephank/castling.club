@@ -7,8 +7,8 @@
 let
 
   yarnBin = fetchurl {
-    url = "https://repo.yarnpkg.com/4.1.0/packages/yarnpkg-cli/bin/yarn.js";
-    hash = "sha512-W3vAVcrWMnPdon3xVwpdLrSp8Ds1s5TT1VOTwqVWChf1zvMJRLEdaki8vPwcOibWGKrncER3TFKbo2y3ca1bDw==";
+    url = "https://repo.yarnpkg.com/4.2.2/packages/yarnpkg-cli/bin/yarn.js";
+    hash = "sha512-xE4oPFTgLenR2oaHAlsDAHjBuWSNKJWmWquOZCJb+3vsuofhgJ/AtLZ3i71HoeKrasZH3kxeODpTp8F9tsP/Sw==";
   };
 
   cacheFolder = ".yarn/cache";
@@ -55,7 +55,7 @@ let
       rm $out/.gitignore
     '';
     outputHashMode = "recursive";
-    outputHash = "sha512-hpaonecwIfooemiVbm6IVkehkg16eICcfMpnSvgv4LVa9lKaReACt/0Qx81MMNfQCqL0ompsCn2Dhswsaugi5A==";
+    outputHash = "sha512-BWpSqBKDzbYMWdEx1pK0yniUEpRV0uiUERkTjrLvqaALZ+CxBMzqPqtk5O865MNdSWGsah2raBy9oR2iGZLWaw==";
   };
 
   # Create a derivation that builds a module in isolation.
