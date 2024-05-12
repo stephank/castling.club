@@ -8,20 +8,19 @@ import { ensureArray } from "../util/misc.js";
 
 export interface SigningService {
   verify(ctx: Context, body: string, store: TripleStore): Promise<PublicKey>;
-  sign(
-    keyId: string,
-    privateKeyPem: string,
-    url: URL,
-    options: RequestInit,
-  ): RequestInit;
+  sign(url: URL, options: RequestInit): RequestInit;
 }
 
 type HeaderMap = Map<string, string[]>;
 
 export default async ({
   domain,
+  publicKeyUrl,
+  privateKeyPem,
 }: {
   domain: string;
+  publicKeyUrl: string;
+  privateKeyPem: string;
 }): Promise<SigningService> => {
   // Verify the `Digest` and `Signature` headers,
   // and return the public key used to sign the request.
@@ -181,14 +180,11 @@ export default async ({
   };
 
   // Sign a request.
-  const sign: SigningService["sign"] = (keyId, privateKeyPem, url, options) => {
+  const sign: SigningService["sign"] = (url, options) => {
     let body = options.body;
-    if (typeof body !== "string" && !Buffer.isBuffer(body)) {
+    if (body != null && typeof body !== "string" && !Buffer.isBuffer(body)) {
       throw Error("Cannot sign streaming body");
     }
-
-    // Hash the body.
-    const sha256 = crypto.createHash("sha256").update(body).digest("base64");
 
     if (!(options.headers instanceof Headers)) {
       options.headers = new Headers(options.headers);
@@ -199,7 +195,10 @@ export default async ({
     headers.set("host", url.host);
 
     // Create the `Digest` header.
-    headers.set("digest", `SHA-256=${sha256}`);
+    if (body != null) {
+      const sha256 = crypto.createHash("sha256").update(body).digest("base64");
+      headers.set("digest", `SHA-256=${sha256}`);
+    }
 
     // Create our own `Date` header, because we include it in the signature.
     headers.set("date", new Date().toUTCString());
@@ -233,7 +232,7 @@ export default async ({
     headers.set(
       "signature",
       [
-        `keyId="${keyId}"`,
+        `keyId="${publicKeyUrl}"`,
         `headers="${signatureHeaders}"`,
         `signature="${signature}"`,
       ].join(","),

@@ -22,6 +22,7 @@ import { CacheService } from "./cache.js";
 import { TripleStore as PlainTripleStore } from "../util/rdf.js";
 import { JSON_ACCEPTS } from "../util/consts.js";
 import { checkPublicUrl } from "../util/misc.js";
+import { SigningService } from "./signing.js";
 
 const { IdentifierIssuer } = jsonldFactory;
 
@@ -97,10 +98,12 @@ export default async ({
   cache,
   isDev,
   origin,
+  signing,
 }: {
   cache: CacheService;
   isDev: boolean;
   origin: string;
+  signing: SigningService;
 }): Promise<JsonLdService> => {
   const jsonld = jsonldFactory();
   const fetchWithCache = fetchFactory({
@@ -110,19 +113,23 @@ export default async ({
     Response,
   });
 
-  // Setup JSON-LD to use 'got' with caching.
+  // Setup JSON-LD to use caching and authorized etch.
   jsonld.documentLoader = async (url: string) => {
     if (!checkPublicUrl(url, "JSON-LD document", isDev)) {
       return null;
     }
 
     debug(`REQ: ${url}`);
-    const res = await fetchWithCache(url, {
-      headers: {
-        "user-agent": `${origin}/`,
-        accept: JSON_ACCEPTS,
-      },
-    });
+    const urlObj = new URL(url);
+    const res = await fetchWithCache(
+      urlObj,
+      signing.sign(urlObj, {
+        headers: {
+          "user-agent": `${origin}/`,
+          accept: JSON_ACCEPTS,
+        },
+      }),
+    );
     if (res.status >= 400) {
       throw Error("HTTP status code " + res.status);
     }
