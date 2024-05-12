@@ -40,16 +40,12 @@ const debug = createDebug("chess:deliver");
 export default async ({
   isDev,
   origin,
-  publicKeyUrl,
-  privateKeyPem,
   pg,
   jsonld,
   signing,
 }: {
   isDev: boolean;
   origin: string;
-  publicKeyUrl: string;
-  privateKeyPem: string;
   pg: Pg;
   jsonld: JsonLdService;
   signing: SigningService;
@@ -180,7 +176,7 @@ export default async ({
       const url = new URL(inbox);
       res = await fetch(
         url,
-        signing.sign(publicKeyUrl, privateKeyPem, url, {
+        signing.sign(url, {
           method: "POST",
           headers: {
             "user-agent": `${origin}/`,

@@ -11,6 +11,8 @@ runCommand "test"
   export PGHOST="$PWD/db"
   # Needed because $USER is not set.
   export PGUSER="$(id -nu)"
+  # Enable debug output.
+  export DEBUG="chess:*"
 
   # Generate a signing key.
   ${../tools/gen-signing-key.sh} signing-key

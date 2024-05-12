@@ -31,7 +31,7 @@ export interface OutboxCtrl {
   createObject(pg: Pg, object: any): Promise<string>;
 }
 
-const debug = createDebug("chess");
+const debug = createDebug("chess:outbox");
 
 export default async ({
   actorUrl,

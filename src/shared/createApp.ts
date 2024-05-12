@@ -63,8 +63,8 @@ export default async ({
   // Parts of the app. These interconnect, so order is important.
   // (Basically poor-man's dependency injection.)
   app.cache = await cacheService(app);
-  app.jsonld = await jsonldService(app);
   app.signing = await signingService(app);
+  app.jsonld = await jsonldService(app);
 
   return app;
 };
