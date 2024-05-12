@@ -1,6 +1,6 @@
 import createDebug from "debug";
 import rdf from "@rdfjs/data-model";
-import { fetchFactory } from "fetchache";
+import { withCache } from "ultrafetch";
 
 import type {
   Term,
@@ -103,12 +103,7 @@ export default async ({
   origin: string;
 }): Promise<JsonLdService> => {
   const jsonld = jsonldFactory();
-  const fetchWithCache = fetchFactory({
-    cache: cache.http,
-    fetch,
-    Request,
-    Response,
-  });
+  const fetchWithCache = withCache(fetch, { cache: cache.http });
 
   // Setup JSON-LD to use 'got' with caching.
   jsonld.documentLoader = async (url: string) => {

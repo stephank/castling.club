@@ -1,19 +1,20 @@
 import createDebug from "debug";
 
 import type { Pg } from "../util/q.js";
-import type { FetchacheCacheEntry } from "fetchache";
 import { identity } from "../util/misc.js";
 
 export interface CacheStore<T> {
   get(id: string): Promise<T | undefined>;
-  set(id: string, data: T): Promise<void>;
+  has(id: string): Promise<boolean>;
+  set(id: string, data: T): Promise<this>;
   delete(id: string): Promise<boolean>;
   clear(): Promise<void>;
+  readonly size: number;
 }
 
 export interface CacheService {
   draw: CacheStore<Buffer>;
-  http: CacheStore<FetchacheCacheEntry>;
+  http: CacheStore<string>;
 }
 
 const debug = createDebug("chess:cache");
@@ -51,6 +52,10 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
       }
     },
 
+    async has(id: string) {
+      return (await this.get(id)) !== undefined;
+    },
+
     async set(id, value) {
       debug(`SET ${name}: ${id}`);
       await pg.query({
@@ -63,6 +68,7 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
         `,
         values: [id, serialize(value)],
       });
+        return this
     },
 
     async delete(id) {
@@ -87,12 +93,16 @@ export default async ({ pg }: { pg: Pg }): Promise<CacheService> => {
         `,
       });
     },
+
+    get size(): number {
+      throw new Error("not implemented");
+    },
   });
 
   // Create default stores.
   return {
     draw: createStore<Buffer>("draw_cache"),
-    http: createStore<FetchacheCacheEntry>("http_cache", {
+    http: createStore<string>("http_cache", {
       serialize: JSON.stringify,
       deserialize: JSON.parse,
     }),
