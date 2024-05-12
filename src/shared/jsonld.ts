@@ -116,26 +116,32 @@ export default async ({
   // Setup JSON-LD to use caching and authorized etch.
   jsonld.documentLoader = async (url: string) => {
     if (!checkPublicUrl(url, "JSON-LD document", isDev)) {
+      debug(`Reject dereference of non-public URL: ${url}`);
       return null;
     }
 
     debug(`REQ: ${url}`);
-    const urlObj = new URL(url);
-    const res = await fetchWithCache(
-      urlObj,
-      signing.sign(urlObj, {
-        headers: {
-          "user-agent": `${origin}/`,
-          accept: JSON_ACCEPTS,
-        },
-      }),
-    );
-    if (res.status >= 400) {
-      throw Error("HTTP status code " + res.status);
-    }
+    try {
+      const urlObj = new URL(url);
+      const res = await fetchWithCache(
+        urlObj,
+        signing.sign(urlObj, {
+          headers: {
+            "user-agent": `${origin}/`,
+            accept: JSON_ACCEPTS,
+          },
+        }),
+      );
+      if (res.status >= 400) {
+        throw Error("HTTP status code " + res.status);
+      }
 
-    const document = await res.json();
-    return { document };
+      const document = await res.json();
+      return { document };
+    } catch (err: any) {
+      debug(`Fetch failed: ${url} - ${err.message}`);
+      throw err;
+    }
   };
 
   const createStore = () => new TripleStore(jsonld);

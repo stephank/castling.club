@@ -30,7 +30,7 @@ export interface InboxCtrl extends EventEmitter {
   on(event: "noteCreated", listener: (object: ObjectExt) => void): this;
 }
 
-const debug = createDebug("chess");
+const debug = createDebug("chess:inbox");
 
 export default async ({
   isDev,
