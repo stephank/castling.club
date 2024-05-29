@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -12,7 +12,7 @@
         inherit (pkgs) lib stdenv;
 
         # Major Node.js version.
-        nodejs = pkgs.nodejs_20;
+        nodejs = pkgs.nodejs_22;
 
         corepack = pkgs.corepack.override {
           inherit nodejs;
