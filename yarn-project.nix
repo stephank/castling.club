@@ -58,6 +58,39 @@ let
     outputHash = "sha512-CoUqK42++SwFWnJb9I9BdqYZMtcnbj0ZC65m8qxgA4q6kXlfMvDRzZEq9LCcrhXMApQZPH6daMQP3nhDuixSrA==";
   };
 
+  # Create a derivation that builds a module in isolation.
+  mkIsolatedBuild = { pname, version, reference, locators ? [] }: stdenv.mkDerivation (drvCommon // {
+    inherit pname version;
+    dontUnpack = true;
+
+    configurePhase = ''
+      ${buildVars}
+      unset yarn_enable_nixify # plugin is not present
+    '';
+
+    buildPhase = ''
+      mkdir -p .yarn/cache
+      cp --reflink=auto --recursive ${cacheDrv}/* .yarn/cache/
+
+      echo '{ "dependencies": { "${pname}": "${reference}" } }' > package.json
+      install -m 0600 ${lockfile} ./yarn.lock
+      export yarn_global_folder="$TMP"
+      export yarn_enable_global_cache=false
+      export yarn_enable_immutable_installs=false
+      yarn
+    '';
+
+    installPhase = ''
+      unplugged=( .yarn/unplugged/${pname}-*/node_modules/* )
+      if [[ ! -e "''${unplugged[@]}" ]]; then
+        echo >&2 "Could not find the unplugged path for ${pname}"
+        exit 1
+      fi
+
+      mv "$unplugged" $out
+    '';
+  });
+
   # Main project derivation.
   project = stdenv.mkDerivation (drvCommon // {
     inherit src;
@@ -88,6 +121,14 @@ let
       # main project. This is necessary for native bindings that maybe have
       # hardcoded values.
       runHook preConfigure
+
+      # Copy in isolated builds.
+      echo 'injecting build for canvas'
+      yarn nixify inject-build \
+        "canvas@npm:2.11.2" \
+        ${isolated."canvas@npm:2.11.2"} \
+        ".yarn/unplugged/canvas-npm-2.11.2-824d893a31/node_modules/canvas"
+      echo 'running yarn install'
 
       # Run normal Yarn install to complete dependency installation.
       yarn install --immutable --immutable-cache
@@ -144,4 +185,5 @@ let
 
   overriddenProject = optionalOverride overrideAttrs project;
 
+isolated."canvas@npm:2.11.2" = optionalOverride (args.overrideCanvasAttrs or null) (mkIsolatedBuild { pname = "canvas"; version = "2.11.2"; reference = "npm:2.11.2"; });
 in overriddenProject
