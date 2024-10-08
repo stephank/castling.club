@@ -103,7 +103,7 @@ export default async ({
     }
 
     // Load the actor document of the other player.
-    const otherId = mentions.values().next().value;
+    const otherId = mentions.values().next().value!;
     const store = jsonld.createStore();
     try {
       await store.load(otherId);
