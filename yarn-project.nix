@@ -7,8 +7,8 @@
 let
 
   yarnBin = fetchurl {
-    url = "https://repo.yarnpkg.com/4.5.3/packages/yarnpkg-cli/bin/yarn.js";
-    hash = "sha512-MAOhQBLimHBy0kTHIFBlScGqtz7nKCCPGyWAqf1nuS1humsI/pP23OaP13Hjrx5ZoK+ijdJC3QlA1zuV/t1OkA==";
+    url = "https://repo.yarnpkg.com/4.6.0/packages/yarnpkg-cli/bin/yarn.js";
+    hash = "sha512-U4PMElZ6lfHWaPvnYt/gB1xZW0v/9DO+R4274k4FJRqOjD65kqmGZnwdU7bDqchbg5jDWpYFh/vZ+joJFUBnKA==";
   };
 
   cacheFolder = ".yarn/cache";
@@ -55,7 +55,7 @@ let
       rm $out/.gitignore
     '';
     outputHashMode = "recursive";
-    outputHash = "sha512-xjpfv8ahHf6t2Yu+Xp5jZNIhorOtajIJbJLtI+TbA5PEwkefoZcGS9HLB78cVAGgHKoX2lA/cFc17YdNyQN22w==";
+    outputHash = "sha512-6R92dHoSBurEJrjp/EBezFAYmwMHJCjJWmnmekXy80C7dM2FVQ6aNMj2/bLcpOhs8suowCJk1eYRipni8TuxYA==";
   };
 
   # Create a derivation that builds a module in isolation.
@@ -125,9 +125,9 @@ let
       # Copy in isolated builds.
       echo 'injecting build for canvas'
       yarn nixify inject-build \
-        "canvas@npm:2.11.2" \
-        ${isolated."canvas@npm:2.11.2"} \
-        ".yarn/unplugged/canvas-npm-2.11.2-824d893a31/node_modules/canvas"
+        "canvas@npm:3.1.0" \
+        ${isolated."canvas@npm:3.1.0"} \
+        ".yarn/unplugged/canvas-npm-3.1.0-88957473bd/node_modules/canvas"
       echo 'running yarn install'
 
       # Run normal Yarn install to complete dependency installation.
@@ -185,5 +185,5 @@ let
 
   overriddenProject = optionalOverride overrideAttrs project;
 
-isolated."canvas@npm:2.11.2" = optionalOverride (args.overrideCanvasAttrs or null) (mkIsolatedBuild { pname = "canvas"; version = "2.11.2"; reference = "npm:2.11.2"; });
+isolated."canvas@npm:3.1.0" = optionalOverride (args.overrideCanvasAttrs or null) (mkIsolatedBuild { pname = "canvas"; version = "3.1.0"; reference = "npm:3.1.0"; });
 in overriddenProject
