@@ -12,7 +12,7 @@
         inherit (pkgs) lib stdenv;
 
         # Major Node.js version.
-        nodejs = pkgs.nodejs_22;
+        nodejs = pkgs.nodejs_20;
 
         corepack = pkgs.corepack.override {
           inherit nodejs;
