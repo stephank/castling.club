@@ -15,7 +15,7 @@ runCommand "test"
   export DEBUG="chess:*"
 
   # Generate a signing key.
-  ${../tools/gen-signing-key.sh} signing-key
+  bash ${../tools/gen-signing-key.sh} signing-key
 
   # Initialize and start PostgreSQL.
   initdb -D db

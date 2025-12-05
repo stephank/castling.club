@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -12,7 +12,7 @@
         inherit (pkgs) lib stdenv;
 
         # Major Node.js version.
-        nodejs = pkgs.nodejs_20;
+        nodejs = pkgs.nodejs_24;
 
         corepack = pkgs.corepack.override {
           inherit nodejs;
@@ -20,12 +20,7 @@
 
         # Packages required to build the `canvas` npm package.
         nativeCanvasDeps = with pkgs; [ python3 pkg-config ];
-        canvasDeps = with pkgs; (
-          [ pixman cairo pango libjpeg ]
-          ++ lib.optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks;
-          [ CoreText xcbuild ]
-          )
-        );
+        canvasDeps = with pkgs; [ pixman cairo pango libjpeg ];
 
         # Import and amend the app build from yarn-plugin-nixify.
         package = pkgs.callPackage ./yarn-project.nix

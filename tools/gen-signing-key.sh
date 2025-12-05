@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Generate the actor signing keypair.
 set -euo pipefail
 
-if [ $# -ne 1 ]; then
+if [[ $# -ne 1 ]]; then
   echo >&2 "Usage: $0 <filename>"
   exit 64
 fi
