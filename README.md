@@ -10,14 +10,13 @@ it! Send me a toot: [@kosinus@hachyderm.io]
 
 ## How to run
 
-To run the app, you need [Node.js] (at least 16.x), [Yarn], and [PostgreSQL] (at
-least 9.6).
+To run the app, you need [Node.js] and [PostgreSQL].
 
 First, install the dependencies and build the TypeScript code:
 
 ```sh
-yarn install
-yarn build
+npm install
+npm run build
 ```
 
 Next, you should configure the app.
@@ -92,20 +91,20 @@ Now generate the signing key:
 Make sure the database exists in PostgreSQL, then create the schema:
 
 ```sh
-yarn migrate up
+npm run migrate up
 ```
 
 The app can now be started with:
 
 ```sh
-yarn start
+npm start
 ```
 
 Debug logging is provided by the [debug] module. For development,
 castling.club's own debug logging can be enabled using, for example:
 
 ```sh
-DEBUG='chess:*' yarn start
+DEBUG='chess:*' npm start
 ```
 
 ## Testing
@@ -188,9 +187,7 @@ actual template files are [EJS] files, found in `assets/tmpl/`.
 [activitypub]: https://activitypub.rocks/
 [@kosinus@hachyderm.io]: https://hachyderm.io/@kosinus
 [node.js]: https://nodejs.org/
-[yarn]: https://yarnpkg.com/
 [postgresql]: https://www.postgresql.org/
-[yarn]: https://yarnpkg.com/
 [nodeinfo]: https://nodeinfo.diaspora.software/
 [debug]: https://github.com/visionmedia/debug#readme
 [mastodon patch]: ./tools/ext/mastodon-plain-http.patch
