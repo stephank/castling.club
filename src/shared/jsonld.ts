@@ -40,7 +40,7 @@ const fromPlainTerm = (plainTerm: PlainTerm): Term => {
     case "NamedNode":
       return rdf.namedNode(plainTerm.value);
     case "BlankNode":
-      return rdf.blankNode(plainTerm.value.substr(2));
+      return rdf.blankNode(plainTerm.value);
     case "Literal":
       return rdf.literal(
         plainTerm.value,
