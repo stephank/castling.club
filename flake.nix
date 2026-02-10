@@ -1,64 +1,52 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
+  outputs =
+    { self, nixpkgs }:
+    let
 
-        inherit (pkgs) lib stdenv;
+      inherit (nixpkgs) lib;
 
-        # Major Node.js version.
-        nodejs = pkgs.nodejs_24;
+      # Instantiate Nixpkgs with our overlay.
+      pkgsBySystem = lib.mapAttrs (
+        system: unused:
+        import nixpkgs {
+          inherit system;
+          overlays = [ self.overlays.default ];
+        }
+      ) nixpkgs.legacyPackages;
 
-        corepack = pkgs.corepack.override {
-          inherit nodejs;
-        };
+      # Iterate Nixpkgs instances.
+      eachSystem = f: lib.mapAttrs (unused: f) pkgsBySystem;
 
-        # Packages required to build the `canvas` npm package.
-        nativeCanvasDeps = with pkgs; [ python3 pkg-config ];
-        canvasDeps = with pkgs; [ pixman cairo pango libjpeg ];
+    in
+    {
+      # The primary export is a Nixpkgs overlay.
+      overlays.default = final: prev: {
+        castling-club = final.callPackage ./package.nix { };
+      };
 
-        # Import and amend the app build from yarn-plugin-nixify.
-        package = pkgs.callPackage ./yarn-project.nix
-          {
-            inherit nodejs;
-          }
-          {
-            src = ./.;
-            overrideAttrs = old: {
-              buildPhase = "yarn build";
-              checkPhase = "yarn test";
-              doCheck = true;
-            };
-            overrideCanvasAttrs = old: {
-              nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ nativeCanvasDeps;
-              buildInputs = (old.buildInputs or [ ]) ++ canvasDeps;
-              env = lib.optionalAttrs (stdenv.isDarwin && stdenv.isx86_64) {
-                NIX_CFLAGS_COMPILE = "-D__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__=101300";
-              };
-            };
-          };
-
-      in
-      {
-
-        # For `nix build`
-        packages.default = package;
-
-        # For `nix develop`
-        devShells.default = pkgs.mkShell {
-          nativeBuildInputs = nativeCanvasDeps;
-          buildInputs = (with pkgs; [ postgresql nixpkgs-fmt ])
-            ++ canvasDeps
-            ++ [ nodejs corepack ];
-        };
-
-        # For `nix flake check`
-        checks.default = import ./functional-test/run.nix package pkgs;
-
+      # For `nix build`
+      packages = eachSystem (pkgs: {
+        default = pkgs.castling-club;
       });
+
+      # For `nix develop`
+      devShells = eachSystem (pkgs: {
+        default = pkgs.mkShell {
+          inputsFrom = [ pkgs.castling-club ];
+          nativeBuildInputs = [ pkgs.postgresql ];
+        };
+      });
+
+      # For `nix flake check`
+      checks = eachSystem (pkgs: {
+        default = pkgs.callPackage ./functional-test/run.nix { };
+      });
+
+      # For `nix fmt`
+      formatter = eachSystem (pkgs: pkgs.nixfmt-tree);
+    };
 }
