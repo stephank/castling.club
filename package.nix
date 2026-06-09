@@ -4,7 +4,7 @@
 {
   buildNpmPackage,
   importNpmLock,
-  nodejs_24,
+  nodejs_26,
   pkg-config,
   pixman,
   cairo,
@@ -17,7 +17,7 @@ buildNpmPackage {
   version = "0.0.0";
   src = ./.;
 
-  nodejs = nodejs_24;
+  nodejs = nodejs_26;
 
   npmDeps = importNpmLock { npmRoot = ./.; };
   npmConfigHook = importNpmLock.npmConfigHook;
